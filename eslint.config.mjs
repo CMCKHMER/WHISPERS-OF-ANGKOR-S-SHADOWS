@@ -44,7 +44,13 @@ const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
     "no-useless-escape": "off",
   },
 }, {
-  ignores: ["node_modules/**", ".next/**", "out/**", "build/**", "next-env.d.ts", "examples/**", "skills"]
+  // lint the Next.js app (src/**) only — everything else is vendored,
+  // minified, generated, or local working files
+  ignores: [
+    "node_modules/**", ".next/**", "out/**", "build/**", "next-env.d.ts",
+    "examples/**", "skills", "scripts/**", "public/**", ".zscripts/**",
+    "download/**", "upload/**", "db/**", "tests/**"
+  ]
 }];
 
 export default eslintConfig;

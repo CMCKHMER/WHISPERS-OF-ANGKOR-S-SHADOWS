@@ -155,6 +155,46 @@
   #forgeCloseBtn { display:block; margin:14px auto 0; font:11px Georgia,serif; letter-spacing:2px;
     color:rgba(243,234,210,.7); background:none; border:1px solid rgba(243,234,210,.3); padding:7px 22px; cursor:pointer; }
   #forgeCloseBtn:hover { color:#fff; border-color:rgba(214,169,74,.6); }
+
+  /* spirit bar (blessings) */
+  .barrow .bar.spiritBar { background:rgba(112,232,255,.09); }
+  .barrow .bar.spiritBar .fill { background:linear-gradient(90deg,#1c6e86,#70e8ff); box-shadow:0 0 8px rgba(112,232,255,.35); }
+  .barlabel.spiritLbl { color:rgba(112,232,255,.8); }
+
+  /* spell slots (blessings) */
+  #spellbar { position:absolute; bottom:16px; left:16px; display:flex; gap:7px; z-index:6; }
+  .spell { width:52px; padding:6px 5px 5px; background:rgba(2,4,3,.72); border:1px solid rgba(112,232,255,.35);
+    border-radius:6px; text-align:center; position:relative; overflow:hidden; }
+  .spell.locked { opacity:.32; border-color:rgba(243,234,210,.18); }
+  .spell .k { font:10px Georgia,serif; color:rgba(112,232,255,.9); letter-spacing:1px; display:block; }
+  .spell .nm { font:9.5px Georgia,serif; color:rgba(243,234,210,.85); display:block; margin-top:2px; line-height:1.25; }
+  .spell .cost { font:9px Georgia,serif; color:rgba(214,169,74,.75); display:block; margin-top:1px; }
+  .spell .cdFill { position:absolute; left:0; bottom:0; width:100%; background:rgba(0,0,0,.62); pointer-events:none; }
+  .spell.starved { border-color:rgba(200,32,47,.55); }
+  .spell.starved .cost { color:rgba(200,32,47,.9); }
+
+  /* item belt */
+  #itembar { position:absolute; bottom:16px; right:16px; display:flex; gap:7px; z-index:6; }
+  .ibelt { width:52px; padding:6px 5px 5px; background:rgba(2,4,3,.72); border:1px solid rgba(214,169,74,.4);
+    border-radius:6px; text-align:center; position:relative; }
+  .ibelt.empty { opacity:.35; }
+  .ibelt .k { font:10px Georgia,serif; color:rgba(214,169,74,.9); letter-spacing:1px; display:block; }
+  .ibelt .nm { font:9.5px Georgia,serif; color:rgba(243,234,210,.85); display:block; margin-top:2px; line-height:1.25; }
+  .ibelt .ct { font:9.5px Georgia,serif; color:rgba(112,232,255,.85); display:block; margin-top:1px; }
+
+  /* market stalls (Tevy's charms · Sokha's remedies) — same bones as the forge */
+  #shop { position:absolute; inset:0; background:rgba(1,2,3,.55); backdrop-filter:blur(2px); z-index:20;
+    display:none; align-items:center; justify-content:center; }
+  #shop.open { display:flex; }
+  #shopBox { width:440px; max-height:78vh; overflow-y:auto; padding:20px 24px; background:rgba(6,10,12,.96);
+    border:1px solid rgba(214,169,74,.5); border-radius:8px; box-shadow:0 0 60px rgba(0,0,0,.8); }
+  #shopBox h2 { font-size:22px; font-weight:normal; letter-spacing:5px; color:var(--gold); margin:0 0 4px; text-align:center; }
+  #shopHead { font:11.5px Georgia,serif; color:rgba(243,234,210,.6); text-align:center; margin-bottom:12px; letter-spacing:.5px; }
+  #shopHead b { color:var(--gold); }
+  #shopGoods .fRow, #shopSell .fRow { cursor:default; }
+  #shopCloseBtn { display:block; margin:14px auto 0; font:11px Georgia,serif; letter-spacing:2px;
+    color:rgba(243,234,210,.7); background:none; border:1px solid rgba(243,234,210,.3); padding:7px 22px; cursor:pointer; }
+  #shopCloseBtn:hover { color:#fff; border-color:rgba(214,169,74,.6); }
 </style>
 </head>
 <body>
@@ -164,9 +204,24 @@
   <!-- HUD -->
   <div id="vitals" class="glass">
     <div class="barrow"><div class="barlabel">HP</div><div class="bar"><div class="fill" id="hpFill"></div></div></div>
+    <div class="barrow"><div class="barlabel spiritLbl">SPIRIT</div><div class="bar spiritBar"><div class="fill" id="spiritFill"></div></div></div>
     <div class="barrow"><div class="barlabel">SANITY</div><div class="bar"><div class="fill" id="sanFill"></div></div></div>
     <div class="xprow"><div class="bar"><div class="fill" id="xpFill"></div></div></div>
     <div class="vitmeta"><span>LV <b id="lvTag">1</b></span><span>Gold <b id="goldTagN">0</b></span><span>Relics <b id="relicTagN">0</b></span><span id="clockTag">Clear Night</span></div>
+  </div>
+
+  <div id="spellbar">
+    <div class="spell" id="sp1"><span class="k">1</span><span class="nm">Moonward Step</span><span class="cost">25 spirit</span><div class="cdFill"></div></div>
+    <div class="spell" id="sp2"><span class="k">2</span><span class="nm">Krasue Fire</span><span class="cost">30 spirit</span><div class="cdFill"></div></div>
+    <div class="spell" id="sp3"><span class="k">3</span><span class="nm">Neak Coil</span><span class="cost">40 spirit</span><div class="cdFill"></div></div>
+    <div class="spell" id="sp4"><span class="k">4</span><span class="nm">Apsara Blessing</span><span class="cost">50 spirit</span><div class="cdFill"></div></div>
+  </div>
+
+  <div id="itembar">
+    <div class="ibelt" id="itH"><span class="k">H</span><span class="nm">Lotus Poultice</span><span class="ct">×0</span></div>
+    <div class="ibelt" id="itC"><span class="k">C</span><span class="nm">Incense</span><span class="ct">×0</span></div>
+    <div class="ibelt" id="itX"><span class="k">X</span><span class="nm">Rice Offering</span><span class="ct">×0</span></div>
+    <div class="ibelt" id="itG"><span class="k">G</span><span class="nm">Luck-Knot</span><span class="ct">×0</span></div>
   </div>
 
   <div id="quest" class="glass">
@@ -181,7 +236,7 @@
   <div id="combo"><div class="n" id="comboN">3</div><div class="t">HIT COMBO</div></div>
   <div id="quote"></div>
   <div id="interactTip"></div>
-  <div id="hintbar">WASD / Arrows move · SHIFT sprint · LMB/J strike · SPACE dodge · E talk · Drag / Q·R look · V curse-vision · M map · TAB menu</div>
+  <div id="hintbar">WASD / Arrows move · SHIFT sprint · LMB/J strike · SPACE dodge · E talk · 1–4 blessings · H heal · C incense · X rice · G charm · Drag / Q·R look · V curse-vision · M map · TAB menu</div>
 
   <div id="fullmap">
     <h2>SAMBOK CHAS — THE DROWNED VILLAGE</h2>
@@ -200,6 +255,16 @@
     </div>
   </div>
 
+  <div id="shop">
+    <div id="shopBox">
+      <h2 id="shopTitle">THE CHARM STALL</h2>
+      <div id="shopHead">Tevy's rope of knots sways in no wind at all. &nbsp;Gold <b id="shopGoldN">0</b></div>
+      <div class="forgeSect" id="shopSect">GOODS</div>
+      <div id="shopGoods"></div>
+      <button id="shopCloseBtn">LEAVE THE STALL · ESC</button>
+    </div>
+  </div>
+
   <div id="vignette"></div>
   <div id="cursefx"></div>
   <div id="flash"></div>
@@ -207,7 +272,7 @@
 
   <div id="pausePanel">
     <h2>PAUSED</h2>
-    <div class="tip">WASD / Arrows move · SHIFT sprint · LMB strike · SPACE dodge<br>E interact · Drag / Q·R look · Wheel zoom · V curse-vision · TAB/P resume · M map</div>
+    <div class="tip">WASD / Arrows move · SHIFT sprint · LMB strike · SPACE dodge<br>E interact · 1–4 blessings · H heal · C incense · X rice · G charm · Drag / Q·R look · Wheel zoom · V curse-vision · TAB/P resume · M map</div>
     <div id="pauseBtns">
       <button class="menuBtn small" id="resumeBtn">RESUME</button>
       <button class="menuBtn small" id="mapBtn">MAP</button>
@@ -228,7 +293,7 @@
     <div class="sub">— a dark Khmer folklore action RPG · 3D —</div>
     <button class="menuBtn" id="newGameBtn">NEW GAME</button>
     <div class="ctr">A girl, a dagger, and the things that whisper in the paddies.<br>
-    WASD / Arrow keys move · SHIFT sprint · LMB strike · SPACE dodge · E talk<br>Drag / Q·R rotate camera · Wheel zoom · V curse-vision · M full map</div>
+    WASD / Arrow keys move · SHIFT sprint · LMB strike · SPACE dodge · E talk<br>1–4 blessings · H heal · C incense · X rice offering · G charm · Drag / Q·R rotate camera · Wheel zoom · V curse-vision · M full map</div>
   </div>
   <div id="loading">SUMMONING THE NIGHT …</div>
 
@@ -2060,9 +2125,15 @@ const P_player = {
   hurtT: 0, kbVel: new THREE.Vector3(),
   strikeDone: [false, false, false],
   hp: 100, hpMax: 100, sanity: 100, sanMax: 100,
+  spirit: 60, spiritMax: 60, spiritRegen: 5,
   lv: 1, xp: 0, xpNext: 40, gold: 0,
   weapon: "dagger", weapons: ["dagger"], relics: [], upTier: { dmg: 0, hp: 0, san: 0 }, upDmg: 0,
   emberBlade: false,
+  /* blessings (magic) — unlocked by story; each: { cd, veilT } style timers live here */
+  spells: {}, spellCd: { moonstep: 0, ghostfire: 0, neakcoil: 0, apsara: 0 },
+  veilT: 0, danceT: 0, sightT: 0, charmT: 0, pacifyPulse: 0,
+  /* usable items (bought at stalls, found in caches) */
+  inv: { poultice: 0, incense: 1, rice: 2, charm: 1 },
   iframes: 0, dead: false,
   speedWalk: 2.35, speedRun: 4.7
 };
@@ -2109,6 +2180,18 @@ function updateBopha(dt) {
   /* -------- global buttons -------- */
   const atkPress = W3.mouse.once || W3.keysOnce.j;
   const dodgePress = W3.keysOnce[" "];
+
+  /* -------- blessings (1–4) + items (H/C/X/G) -------- */
+  if (p.mode !== "dead" && p.mode !== "climb") {
+    if (W3.keysOnce["1"]) castSpell("moonstep");
+    if (W3.keysOnce["2"]) castSpell("ghostfire");
+    if (W3.keysOnce["3"]) castSpell("neakcoil");
+    if (W3.keysOnce["4"]) castSpell("apsara");
+    if (W3.keysOnce.h) useItem("poultice");
+    if (W3.keysOnce.c) useItem("incense");
+    if (W3.keysOnce.x) useItem("rice");
+    if (W3.keysOnce.g) useItem("charm");
+  }
 
   /* -------- state machine -------- */
   if (p.mode === "dead") {
@@ -2197,7 +2280,7 @@ function updateBopha(dt) {
 
   /* -------- locomotion -------- */
   if (p.mode === "loco" || p.mode === "hurt") {
-    const spd = wantRun ? p.speedRun : p.speedWalk;
+    const spd = (wantRun ? p.speedRun : p.speedWalk) * (p.veilT > 0 ? 1.35 : 1);
     if (moving) {
       a.root.position.addScaledVector(_mv, dt * spd);
       p.yaw = angDamp(p.yaw, Math.atan2(_mv.x, _mv.z), 11, dt);
@@ -2283,8 +2366,11 @@ function _fwd(yaw) { return new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw)); 
 function hurtPlayer(amount, fromPos) {
   const p = P_player, a = p.actor;
   if (p.dead || p.iframes > 0 || W3.state !== "play") return;
+  /* Tevy's luck-knot: the half that works cuts the damage in two,
+     and keeps the whispers out of your sleep */
+  if (p.charmT > 0) amount = Math.max(1, Math.ceil(amount * .5));
   p.hp = Math.max(0, p.hp - amount);
-  p.sanity = Math.max(0, p.sanity - 6);
+  p.sanity = Math.max(0, p.sanity - (p.charmT > 0 ? 3 : 6));
   hudUpdateVitals();
   camShake(0.22);
   SFX.hurt();
@@ -6951,7 +7037,15 @@ const FOE_KINDS = {
   monk:      { hp: 130, speed: 1.05, dmg: 20, reach: 2.1,  hitR: 2.5, atkCd: 2.4,  tele: .70, strike: .50, lunge: 1.2, fly: false, san: 3.2, drop: [.9, 8, 14], slam: true },
   warden:    { hp: 420, speed: 1.9,  dmg: 18, reach: 2.2,  hitR: 2.6, atkCd: 1.5,  tele: .46, strike: .34, lunge: 10,  fly: true,  san: 4,   drop: [1, 30, 50], boss: true },
   priestess: { hp: 78,  speed: 2.85, dmg: 9,  reach: 0,    hitR: 1.8, atkCd: 2.15, tele: .48, strike: 0,   lunge: 0,   fly: true,  san: 2.4, drop: [1, 6, 12],  ranged: true, burst: 2, elite: true },
-  queen:     { hp: 470, speed: 2.75, dmg: 11, reach: 2.1,  hitR: 2.4, atkCd: 2.0,  tele: .52, strike: .34, lunge: 13,  fly: true,  san: 4.5, drop: [1, 30, 50], ranged: true, burst: 3, boss: true }
+  queen:     { hp: 470, speed: 2.75, dmg: 11, reach: 2.1,  hitR: 2.4, atkCd: 2.0,  tele: .52, strike: .34, lunge: 13,  fly: true,  san: 4.5, drop: [1, 30, 50], ranged: true, burst: 3, boss: true },
+  /* chapter 4-5 — the temple's congregation. Krong Pali: the giant
+     ghost soldier of the causeway (Khmer folklore's Krong Pali,
+     the legion-of-one giant). Vossandei: the kru himself. The
+     Whisperer: the drowned thing he called up, wearing the nāga's
+     stolen face. */
+  krongpali: { hp: 400, speed: 1.55, dmg: 24, reach: 2.7,  hitR: 3.0, atkCd: 2.2,  tele: .62, strike: .50, lunge: 7,   fly: false, san: 4,   drop: [1, 30, 45], slam: true, boss: true },
+  vossandei: { hp: 430, speed: 1.9,  dmg: 15, reach: 2.0,  hitR: 2.2, atkCd: 1.7,  tele: .50, strike: .36, lunge: 10,  fly: false, san: 4.5, drop: [1, 30, 55], ranged: true, burst: 3, boss: true },
+  whisperer: { hp: 580, speed: 1.35, dmg: 20, reach: 3.0,  hitR: 3.0, atkCd: 1.8,  tele: .60, strike: .46, lunge: 9,   fly: false, san: 5,   drop: [1, 40, 60], slam: true, ranged: true, burst: 2, boss: true }
 };
 
 /* ---------- wraith model ---------- */
@@ -7193,6 +7287,137 @@ function makeMonkActor() {
 }
 
 /* ---------- spawning ---------- */
+/* ---------- Krong Pali: the giant ghost soldier of the causeway.
+   Khmer folklore's Krong Pali — the legion-of-one giant who still
+   marches his post, rifle and all, long after his war forgot him. ---------- */
+function buildKrongPali() {
+  const g = new THREE.Group();
+  const coatM = new THREE.MeshToonMaterial({ color: 0x8a8266, gradientMap: GRAD, transparent: true, opacity: .92 });
+  const darkM = new THREE.MeshToonMaterial({ color: 0x565040, gradientMap: GRAD, transparent: true, opacity: .92 });
+  /* greatcoat shroud */
+  const coat = new THREE.Mesh(coneGeo(.5, 1.3, 0x8a8266, 9), coatM);
+  coat.position.y = .8; coat.rotation.x = Math.PI;
+  const coat2 = new THREE.Mesh(coneGeo(.34, .8, 0x565040, 8), darkM);
+  coat2.position.y = .38; coat2.rotation.x = Math.PI;
+  /* gaunt face under a pith helmet */
+  const face = new THREE.Mesh(sphGeo(.2, 0x9aa08a, 9),
+    new THREE.MeshToonMaterial({ color: 0x9aa08a, gradientMap: GRAD, transparent: true, opacity: .95 }));
+  face.position.y = 1.52; face.scale.set(.92, 1, .72);
+  const helmet = new THREE.Mesh(sphGeo(.24, 0x5c5846, 10), darkM);
+  helmet.scale.set(1.1, .55, 1.1); helmet.position.y = 1.68;
+  const brim = new THREE.Mesh(cylGeo(.3, .3, .03, 0x4a4638, 10), darkM);
+  brim.position.y = 1.62;
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0xc7d6a0 });
+  for (const s of [-1, 1]) {
+    const e = new THREE.Mesh(sphGeo(.034, 0xc7d6a0, 6), eyeMat);
+    e.position.set(s * .07, 1.56, .17); g.add(e);
+  }
+  /* slung rifle — he never put it down */
+  const rifle = new THREE.Mesh(cylGeo(.028, .028, 1.5, 0x3a3328, 6), darkM);
+  rifle.position.set(.34, 1.05, .1); rifle.rotation.z = -.5; rifle.rotation.x = .2;
+  const bayo = new THREE.Mesh(coneGeo(.03, .18, 0x7d8894, 6),
+    new THREE.MeshToonMaterial({ color: 0x7d8894, gradientMap: GRAD }));
+  bayo.position.set(.66, 1.62, .12); bayo.rotation.z = -.5;
+  /* faded rank sash */
+  const sash = new THREE.Mesh(boxGeo2(.5, .07, .3, 0x8e1622), coatM);
+  sash.position.y = 1.1; sash.rotation.z = .12;
+  g.add(coat, coat2, face, helmet, brim, rifle, bayo, sash);
+  g.scale.setScalar(2.05);
+  g.traverse(o => { if (o.isMesh) o.castShadow = false; });
+  return { root: g, eyeMat };
+}
+/* helper: plain box with vertex color (used by the giant) */
+function boxGeo2(w, h, d, color) {
+  return setVertColor(new THREE.BoxGeometry(w, h, d, 1, 1, 1), color);
+}
+
+/* ---------- Kru Vossandei: the spirit-medium, once the village's own.
+   White funeral robes, a bone staff, and a third eye that opens
+   where a man used to keep his conscience. ---------- */
+function buildKruVossandei() {
+  const g = new THREE.Group();
+  const robeM = new THREE.MeshToonMaterial({ color: 0xd8cdb4, gradientMap: GRAD, transparent: true, opacity: .94 });
+  const shadeM = new THREE.MeshToonMaterial({ color: 0xb8ad96, gradientMap: GRAD, transparent: true, opacity: .94 });
+  const robe = new THREE.Mesh(coneGeo(.44, 1.25, 0xd8cdb4, 9), robeM);
+  robe.position.y = .72; robe.rotation.x = Math.PI;
+  const robe2 = new THREE.Mesh(coneGeo(.3, .8, 0xb8ad96, 8), shadeM);
+  robe2.position.y = .32; robe2.rotation.x = Math.PI;
+  /* head + third eye */
+  const head = new THREE.Mesh(sphGeo(.16, 0xc4b8a4, 10), robeM);
+  head.position.y = 1.48; head.scale.set(.9, 1, .88);
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0xd6a94a });
+  for (const s of [-1, 1]) {
+    const e = new THREE.Mesh(sphGeo(.028, 0xd6a94a, 6), eyeMat);
+    e.position.set(s * .055, 1.5, .13); g.add(e);
+  }
+  const third = new THREE.Mesh(sphGeo(.034, 0x9a6fff, 6),
+    new THREE.MeshBasicMaterial({ color: 0x9a6fff }));
+  third.position.set(0, 1.56, .12); g.add(third);
+  /* krama sash — the last red thing he owned */
+  const sash = new THREE.Mesh(boxGeo2(.42, .07, .26, 0x8e1622), robeM);
+  sash.position.y = 1.02; sash.rotation.z = .18;
+  /* bone staff with dangling charms */
+  const staff = new THREE.Mesh(cylGeo(.024, .03, 1.55, 0xcfc6b0, 6), shadeM);
+  staff.position.set(.42, .95, .05); staff.rotation.z = -.12;
+  const knob = new THREE.Mesh(sphGeo(.06, 0xe8e0cc, 8), robeM);
+  knob.position.set(.51, 1.72, .05); g.add(knob);
+  for (let i = 0; i < 3; i++) {
+    const ch = new THREE.Mesh(coneGeo(.022, .1, 0x8e1622, 5), shadeM);
+    ch.rotation.x = Math.PI;
+    ch.position.set(.44 + Math.sin(i * 2.1) * .05, 1.5 - i * .13, .05); g.add(ch);
+  }
+  g.add(robe, robe2, head, sash, staff);
+  g.traverse(o => { if (o.isMesh) o.castShadow = false; });
+  return { root: g, eyeMat };
+}
+
+/* ---------- THE WHISPERER: the thing older than the temple,
+   wearing the drowned nāga's stolen face. A serpent of the
+   flooded dark — black scales, violet eyes, three iron spires. ---------- */
+function buildWhisperer() {
+  const g = new THREE.Group();
+  const scaleM = new THREE.MeshToonMaterial({ color: 0x1a1f2e, gradientMap: GRAD });
+  const scaleM2 = new THREE.MeshToonMaterial({ color: 0x2c3550, gradientMap: GRAD });
+  const scaleDk = new THREE.MeshToonMaterial({ color: 0x10141f, gradientMap: GRAD });
+  /* flooded coil */
+  const c1 = new THREE.Mesh(sphGeo(.45, 0x10141f, 10), scaleDk);
+  c1.scale.set(1.35, .5, 1.1); c1.position.y = .12; g.add(c1);
+  const c2 = new THREE.Mesh(sphGeo(.32, 0x10141f, 10), scaleDk);
+  c2.scale.set(1.15, .5, 1); c2.position.set(.12, .3, -.1); g.add(c2);
+  /* rising body */
+  const segs = [[-.08, .5, .02, .18], [.09, .68, -.02, .165], [-.1, .86, .03, .15], [.08, 1.02, -.01, .13], [-.05, 1.16, .02, .115], [.03, 1.28, 0, .1]];
+  for (const s of segs) {
+    const b = new THREE.Mesh(sphGeo(s[3], 0x1a1f2e, 10), scaleM);
+    b.position.set(s[0], s[1], s[2]); g.add(b);
+  }
+  /* hood + head — the nāga's stolen face, drowned */
+  const hood = new THREE.Mesh(sphGeo(.22, 0x1a1f2e, 12), scaleM);
+  hood.scale.set(1.55, 1.25, .4); hood.position.set(0, 1.4, -.13); g.add(hood);
+  const head = new THREE.Mesh(sphGeo(.14, 0x2c3550, 10), scaleM2);
+  head.scale.set(.92, .88, 1.3); head.position.set(0, 1.49, .1); g.add(head);
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0x9a6fff });
+  for (const s of [-1, 1]) {
+    const e = new THREE.Mesh(sphGeo(.034, 0x9a6fff, 6), eyeMat);
+    e.position.set(s * .06, 1.52, .19); g.add(e);
+  }
+  /* three iron spires instead of gold */
+  for (const sp of [[-.08, 1.62, -.14, .13], [0, 1.67, -.15, .17], [.08, 1.62, -.14, .13]]) {
+    const s = new THREE.Mesh(coneGeo(.026, sp[3], 0x3a4258, 6),
+      new THREE.MeshToonMaterial({ color: 0x3a4258, gradientMap: GRAD }));
+    s.position.set(sp[0], sp[1], sp[2]); g.add(s);
+  }
+  /* whispering wisp mantle */
+  for (let i = 0; i < 5; i++) {
+    const w = new THREE.Mesh(sphGeo(.05, 0x9a6fff, 6),
+      new THREE.MeshBasicMaterial({ color: 0x9a6fff, transparent: true, opacity: .35 }));
+    w.position.set((hash2(i, 3) - .5) * .5, 1 + (hash2(i, 7) - .5) * .5, -.15 - hash2(i, 11) * .2);
+    g.add(w);
+  }
+  g.scale.setScalar(1.75);
+  g.traverse(o => { if (o.isMesh) o.castShadow = false; });
+  return { root: g, eyeMat, hood };
+}
+
 function spawnFoe(kind, x, z, hpScale = 1) {
   const K = FOE_KINDS[kind];
   let m, actor = null;
@@ -7203,6 +7428,9 @@ function spawnFoe(kind, x, z, hpScale = 1) {
   else if (kind === "priestess") m = buildPriestess();
   else if (kind === "krasue") m = buildKrasue();
   else if (kind === "naga") m = buildNaga();
+  else if (kind === "krongpali") m = buildKrongPali();
+  else if (kind === "vossandei") m = buildKruVossandei();
+  else if (kind === "whisperer") m = buildWhisperer();
   else m = buildWraith();
   const f = {
     kind, k: K, root: m.root, actor,
@@ -7228,7 +7456,10 @@ function spawnFoe(kind, x, z, hpScale = 1) {
       monk: ["A Bralung monk. Broken vows, unbroken fists. Watch the slam.", "BRALUNG MONK"],
       warden: ["The Neak Ta itself leans on the gate. Stand, little blade.", "THE WARDEN"],
       priestess: ["A priestess of the court — gold crown, candle eyes. She spits in volleys; watch the spread.", "COURT PRIESTESS"],
-      queen: ["THE KRASUE QUEEN — she wore a woman's face when the fields were green. End her audience.", "THE KRASUE QUEEN"]
+      queen: ["THE KRASUE QUEEN — she wore a woman's face when the fields were green. End her audience.", "THE KRASUE QUEEN"],
+      krongpali: ["KRONG PALI — the giant of the causeway. His war forgot him; he never forgot his post. Mind the slam.", "KRONG PALI"],
+      vossandei: ["KRU VOSSANDEI — he served this village, then served something older. The ward-song dies with his silence.", "THE KRU"],
+      whisperer: ["THE WHISPERER — older than the temple, older than the song. It wears a drowned nāga's face. It wants the dagger.", "THE WHISPERER"]
     }[kind];
     if (lore) hudQuote(lore[0], lore[1]);
   }
@@ -7284,6 +7515,7 @@ function foesAlive() { return Foes.list.filter(f => !f.dead).length; }
 
 function updateSpawner(dt) {
   if (!Foes.waveActive) return;
+  if (QUEST.phase >= 18) { Foes.waveActive = false; return; }   /* dawn: the night is over */
   if (Foes.queue.length) {
     Foes.spawnTimer -= dt;
     if (Foes.spawnTimer <= 0) {
@@ -7359,6 +7591,20 @@ function updateFoes(dt) {
     const dist = toP.length();
     const inVillage = Math.sqrt(pp.x * pp.x + pp.z * pp.z) < World.wallR - 1.2;
 
+    /* bound by the Neak Coil, or fed by a rice offering: the dead
+       forget what they were doing and stand in the water, dreaming */
+    if (f.coilT > 0 || f.pacifyT > 0) {
+      f.coilT = Math.max(0, f.coilT - dt);
+      f.pacifyT = Math.max(0, f.pacifyT - dt);
+      if (f.state === "chase") f.state = "idle";
+      if (f.coilT > 0 || f.pacifyT > 0) {
+        if (Math.random() < .3)
+          Particles.burst(pos.x, .45, pos.z, 1,
+            { color: f.coilT > 0 ? [0x35816f, 0x70e8ff] : [0xf3ead2, 0xd9cba8], spdMin: .1, spdMax: .6, sMax: .05, lifeMax: .6, grav: 1.2 });
+        continue;                     /* bound dead do nothing else this frame */
+      }
+    }
+
     /* warden & queen: crest orbs + one-time summons at half hp */
     if (K.boss && !f.dead) {
       if (f.orbG) f.orbG.rotation.y += dt * 2.4;
@@ -7372,8 +7618,16 @@ function updateFoes(dt) {
             spawnFoe("krasue", pos.x + Math.sin(a) * 2.2, pos.z + Math.cos(a) * 2.2);
           }
           spawnFoe("priestess", pos.x + Math.sin(f.root.rotation.y) * 3, pos.z + Math.cos(f.root.rotation.y) * 3);
+        } else if (f.kind === "vossandei") {
+          hudQuote("Vossandei sings a name into the water — and the drowned answer him!", "THE KRU CALLS");
+          spawnFoe("drowned", pos.x + rand(-2.6, 2.6), pos.z + rand(-2.6, 2.6));
+          spawnFoe("drowned", pos.x + rand(-2.6, 2.6), pos.z + rand(-2.6, 2.6));
+          spawnFoe("krasue", pos.x + rand(-3, 3), pos.z + rand(-3, 3));
         } else {
-          hudQuote("The Warden shrieks — and the gate answers!", "REINFORCEMENTS");
+          if (f.kind === "whisperer")
+            hudQuote("The Whisperer unfolds — and the whole flooded dark leans in to listen!", "THE WHISPERER CALLS");
+          else if (f.kind !== "krongpali")
+            hudQuote("The Warden shrieks — and the gate answers!", "REINFORCEMENTS");
           for (const s of [-1, 1]) {
             const a = f.root.rotation.y + s * 1.3;
             spawnFoe("wraith", pos.x + Math.sin(a) * 1.8, pos.z + Math.cos(a) * 1.8);
@@ -7576,7 +7830,10 @@ const FOE_FX = {
   monk:    { hit: [0xd8b45a, 0x8a6a2c, 0x4d3a18], die: [0xd8b45a, 0x6b5426, 0x2c2410], spectral: false },
   warden:  { hit: [0x70e8ff, 0xffd76b, 0x274048], die: [0x70e8ff, 0xffd76b, 0xd8ffff], spectral: true },
   priestess: { hit: [0xffc040, 0xc8202f, 0xd6a94a], die: [0xffc040, 0xd6a94a, 0x6e1420], spectral: true },
-  queen:   { hit: [0xff5030, 0xffc040, 0xd6a94a], die: [0xff5030, 0xffd76b, 0xc8202f], spectral: true }
+  queen:   { hit: [0xff5030, 0xffc040, 0xd6a94a], die: [0xff5030, 0xffd76b, 0xc8202f], spectral: true },
+  krongpali: { hit: [0xc7d6a0, 0x8a8266, 0x565040], die: [0xc7d6a0, 0xd8e6c0, 0x8a8266], spectral: true },
+  vossandei: { hit: [0xd8cdb4, 0x9a6fff, 0xd6a94a], die: [0xd8cdb4, 0x9a6fff, 0xe8e0cc], spectral: true },
+  whisperer: { hit: [0x9a6fff, 0x2c3550, 0x70e8ff], die: [0x9a6fff, 0xffd76b, 0x1a1f2e], spectral: true }
 };
 function damageFoe(f, dmg, fromDir) {
   if (f.dead) return;
@@ -7603,6 +7860,15 @@ function damageFoe(f, dmg, fromDir) {
           Math.ceil(rand(10, 17)));
       if (f.kind === "queen") {
         hudQuote("The Queen bursts into crimson fire. Her crown rings on the mud — nine candles, still lit.", "THE QUEEN IS FELLED");
+        camShake(.34);
+      } else if (f.kind === "vossandei") {
+        hudQuote("The kru's robes fold empty, like a shed skin. The staff's charms finally swing free.", "THE KRU FALLS");
+        camShake(.3);
+      } else if (f.kind === "krongpali") {
+        hudQuote("The giant's greatcoat settles like a flag lowered at last.", "THE GIANT RESTS");
+        camShake(.3);
+      } else if (f.kind === "whisperer") {
+        hudQuote("The violet mask cracks down the middle. Behind it: nothing but water, and light.", "THE WHISPERER FADES");
         camShake(.34);
       } else {
         hudQuote("The Warden crumbles into cold mist. The ward-stones sing.", "WARDEN FELLED");
@@ -7709,15 +7975,275 @@ function updateEmbers(dt) {
    COMBAT3D — strike arcs, damage & crits, quest flow
    ============================================================ */
 
+/* ============================================================
+   MAGIC — the blessings of the old ways. Bopha's mother was a
+   kru's apprentice; the dagger remembers her hands, and the
+   spirits answer it. Spirit (mana) regenerates slowly — faster
+   inside the ward wall, fastest at the Neak Ta shrine.
+   Each blessing is taught by the story: the Moonward Step by
+   Chantria (ch1), Krasue Fire by the ember blade (ch2), the
+   Neak Coil by Sovanna Maccha (ch4), the Apsara Blessing by
+   Chantria before the Whisperer (ch5).
+   ============================================================ */
+const SPELLS = {
+  moonstep:  { slot: 1, key: "1", name: "Moonward Step",   cost: 25, cd: 6,
+    unlock: 3,
+    tip: "Chantria's dancer's step — the moon-ward weave carries you between shadows (brief spirit-veil)." },
+  ghostfire: { slot: 2, key: "2", name: "Krasue Fire",     cost: 30, cd: 2.6,
+    unlock: 6,
+    tip: "The ember blade exhales — hurl a burning bolt at the nearest hunger." },
+  neakcoil:  { slot: 3, key: "3", name: "Neak Coil",       cost: 40, cd: 10,
+    unlock: 13,
+    tip: "Sovanna Maccha's gift — serpent coils of the nāga bind nearby dead in place." },
+  apsara:    { slot: 4, key: "4", name: "Apsara Blessing", cost: 50, cd: 26,
+    unlock: 16,
+    tip: "The moon-ward dance, full - heals wounds, quiets dreams, and burns the dead who crowd you." }
+};
+
+const ITEMS = {
+  poultice: { key: "h", name: "Lotus Poultice",   slot: "itH",
+    tip: "Kru Sokha's lotus-and-ginger poultice. Restores 38 health." },
+  incense:  { key: "c", name: "Incense Bundle",   slot: "itC",
+    tip: "Lights for the dead, sight for the living: +25 spirit, +20 sanity, curse-sight for a while." },
+  rice:     { key: "x", name: "Rice Offering",    slot: "itX",
+    tip: "Srey Noch's way: feed the hungry dead and they forget their hunger — for a while." },
+  charm:    { key: "g", name: "Luck-Knot Charm",  slot: "itG",
+    tip: "One of Tevy's honest knots (the half that works): half damage for a while." }
+};
+
+/* ---------- cast a blessing ---------- */
+function castSpell(id) {
+  const p = P_player, a = p.actor;
+  const S = SPELLS[id];
+  if (!S || p.dead || W3.state !== "play") return;
+  if (QUEST.phase < S.unlock) {
+    hudQuote(S.tip, "NOT YET LEARNED");
+    return;
+  }
+  if ((p.spellCd[id] || 0) > 0) return;
+  if (p.spirit < S.cost) {
+    hudQuote("Your spirit is thin. Rest inside the ward, or burn incense.", "SPIRIT TOO LOW");
+    return;
+  }
+  p.spirit -= S.cost;
+  p.spellCd[id] = S.cd;
+
+  if (id === "moonstep") {
+    p.veilT = 1.5;
+    SFX.swish(1);
+    addMomentaryFlash(.12);
+    hudQuote("The moonward weave takes your weight. For a breath, you are the shadow of a shadow.", "MOONWARD STEP");
+  } else if (id === "ghostfire") {
+    const from = a.root.position.clone(); from.y += 1.15;
+    const foe = nearestFoe(a.root.position, 14);
+    const tx = foe ? foe.root.position.x : from.x + _fwd(p.yaw).x * 6;
+    const tz = foe ? foe.root.position.z : from.z + _fwd(p.yaw).z * 6;
+    const ty = foe ? foe.root.position.y + 1.1 : from.y;
+    spawnPlayerBolt(from.x, from.y, from.z, tx, ty, tz);
+    SFX.swish(.9);
+  } else if (id === "neakcoil") {
+    const pos = a.root.position;
+    let bound = 0;
+    for (const f of Foes.list) {
+      if (f.dead) continue;
+      if (f.root.position.distanceTo(pos) < 5.5) {
+        f.coilT = 2.8; bound++;
+        damageFoe(f, 10, _fwd(p.yaw));
+      }
+    }
+    for (let i = 0; i < 26; i++) {
+      const an = (i / 26) * TAU;
+      Particles.burst(pos.x + Math.sin(an) * rand(1.5, 4.5), .3, pos.z + Math.cos(an) * rand(1.5, 4.5), 2,
+        { color: [0x35816f, 0x2a6b5f, 0x70e8ff], spdMin: .2, spdMax: 1.2, sMax: .07, lifeMax: .8, grav: 1.6 });
+    }
+    SFX.bell();
+    camShake(.1);
+    hudQuote(bound ? `The drowned serpent remembers its coiling — ${bound} bound fast.` :
+      "The coil closes on empty reeds. Nothing dead stands within its circle.", "NEAK COIL");
+  } else if (id === "apsara") {
+    p.hp = Math.min(p.hpMax, p.hp + Math.round(p.hpMax * .3));
+    p.sanity = p.sanMax;
+    p.danceT = 8; p.danceTick = 0;
+    SFX.levelup();
+    addMomentaryFlash(.18);
+    const pos = a.root.position;
+    for (let i = 0; i < 30; i++) {
+      const an = (i / 30) * TAU;
+      Particles.burst(pos.x + Math.sin(an) * rand(.6, 2.4), 1.2 + rand(0, .8), pos.z + Math.cos(an) * rand(.6, 2.4), 2,
+        { color: [0xffd76b, 0xd6a94a, 0xfff2c8], spdMin: .2, spdMax: 1, sMax: .06, lifeMax: 1.1, grav: .8 });
+    }
+    hudQuote("Chantria's choreography runs through your hands like river water. Stand and dance.", "APSARA BLESSING");
+  }
+  hudUpdateVitals();
+}
+
+/* ---------- use an item ---------- */
+function useItem(id) {
+  const p = P_player;
+  if (p.dead || W3.state !== "play") return;
+  if ((p.inv[id] || 0) <= 0) {
+    const I = ITEMS[id];
+    const sellers = { poultice: "Kru Sokha", incense: "Kru Sokha", rice: "Tevy", charm: "Tevy" };
+    hudQuote(`No ${I ? I.name.toLowerCase() : "items"} left. ${sellers[id] || "The stalls"} sell them — bring gold.`, "EMPTY POUCH");
+    return;
+  }
+  p.inv[id]--;
+  const a = p.actor, pos = a.root.position;
+  if (id === "poultice") {
+    p.hp = Math.min(p.hpMax, p.hp + 38);
+    SFX.levelup();
+    Particles.burst(pos.x, 1.2, pos.z, 14,
+      { color: [0xf3ead2, 0xf0b4a6, 0xffd76b], spdMin: .3, spdMax: 1.4, sMax: .06, lifeMax: .8, grav: -.6 });
+    hudQuote("The lotus draws the ache out like a splinter. Sokha's hands taught her well.", "LOTUS POULTICE · +38 HP");
+  } else if (id === "incense") {
+    p.spirit = Math.min(p.spiritMax, p.spirit + 25);
+    p.sanity = Math.min(p.sanMax, p.sanity + 20);
+    p.sightT = 12;
+    SFX.bell();
+    Particles.burst(pos.x, 1.1, pos.z, 20,
+      { color: [0x70e8ff, 0xd8e6ff, 0xf3ead2], spdMin: .1, spdMax: .7, sMax: .05, lifeMax: 1.6, grav: -1.2 });
+    hudQuote("Smoke opens the eye the living keep shut. The dead show their outlines now.", "INCENSE · CURSE-SIGHT");
+  } else if (id === "rice") {
+    let fed = 0;
+    for (const f of Foes.list) {
+      if (f.dead) continue;
+      if (f.root.position.distanceTo(pos) < 8) { f.pacifyT = 8; fed++; }
+    }
+    SFX.coin();
+    Particles.burst(pos.x, .5, pos.z, 22,
+      { color: [0xf3ead2, 0xd9cba8, 0xfff6e0], spdMin: .2, spdMax: 1.1, sMax: .05, lifeMax: .9, grav: -2.4 });
+    hudQuote(fed ? `You scatter the rice the way Noch taught you — ${fed} hungry dead forget their hunger.` :
+      "Rice scatters on empty mud. The hungry dead are elsewhere tonight.", "RICE OFFERING");
+  } else if (id === "charm") {
+    p.charmT = 20;
+    SFX.bell();
+    Particles.burst(pos.x, 1, pos.z, 16,
+      { color: [0xc8202f, 0xd6a94a, 0xf3ead2], spdMin: .3, spdMax: 1.2, sMax: .06, lifeMax: .9, grav: -1 });
+    hudQuote("Tevy's knot tightens at your wrist. Half of it works — and the half that works is enough.", "LUCK-KNOT · WARD HALF-DAMAGE");
+  }
+  hudUpdateVitals();
+}
+
+/* ---------- per-frame magic upkeep ---------- */
+function updateMagic(dt) {
+  const p = P_player, a = p.actor;
+  if (W3.state !== "play" || !a) return;
+
+  /* spirit regen: thin in the field, fuller inside the wall,
+     fullest at the Neak Ta shrine */
+  const bx = a.root.position.x, bz = a.root.position.z;
+  let regen = p.spiritRegen;
+  if (Math.hypot(bx, bz) < World.wallR - 1) regen *= 1.7;
+  if (Math.hypot(bx - 9.5, bz - 2) < 6) regen *= 2;
+  p.spirit = Math.min(p.spiritMax, p.spirit + regen * dt);
+
+  /* cooldowns */
+  for (const id in p.spellCd) if (p.spellCd[id] > 0) p.spellCd[id] = Math.max(0, p.spellCd[id] - dt);
+
+  /* blessing timers */
+  if (p.veilT > 0) {
+    p.veilT -= dt;
+    p.iframes = Math.max(p.iframes, p.veilT);
+    if (Math.random() < .5)
+      Particles.burst(bx, .9, bz, 1,
+        { color: [0xbfd4ff, 0x70e8ff], spdMin: 0, spdMax: .3, sMax: .06, lifeMax: .5, grav: .4 });
+  }
+  if (p.charmT > 0) p.charmT -= dt;
+  if (p.sightT > 0) p.sightT -= dt;
+  if (p.danceT > 0) {
+    p.danceT -= dt;
+    p.danceTick = (p.danceTick || 0) - dt;
+    if (p.danceTick <= 0) {
+      p.danceTick = .5;
+      for (const f of Foes.list) {
+        if (f.dead) continue;
+        if (f.root.position.distanceTo(a.root.position) < 2.6)
+          damageFoe(f, 6, _fwd(p.yaw));
+      }
+    }
+    if (Math.random() < .4)
+      Particles.burst(bx + rand(-.8, .8), 1.1 + rand(0, .5), bz + rand(-.8, .8), 1,
+        { color: [0xffd76b, 0xd6a94a], spdMin: .1, spdMax: .5, sMax: .05, lifeMax: .7, grav: .6 });
+  }
+
+  /* the blessings announce themselves once the story teaches them */
+  for (const id in SPELLS) {
+    const S = SPELLS[id];
+    if (QUEST.phase >= S.unlock && !p.spells[id + "_taught"]) {
+      p.spells[id + "_taught"] = true;
+      p.spells[id] = true;
+      hudQuote(S.tip, `NEW BLESSING — ${S.name.toUpperCase()} (KEY ${S.key})`);
+      SFX.levelup();
+    }
+  }
+
+  /* temple threshold: the first crossing wakes its guardians */
+  if (QUEST.phase >= 12 && QUEST.phase <= 16 && !World.templeWoken &&
+      bx > 14.5 && bx < 29.5 && bz > 60.5 && bz < 71.5 && a.root.position.y > terraceTempleY() - 1) {
+    World.templeWoken = true;
+    SFX.wail(); camShake(.16);
+    hudQuote("The flooded gallery exhales. The temple's congregation gathers around you.", "THE TEMPLE WAKES");
+    spawnFoe("drowned", 18, 63.5);
+    spawnFoe("drowned", 26.5, 68);
+    spawnFoe("monk", 21.5, 62.5);
+    if (QUEST.phase >= 12) spawnFoe("naga", 24.5, 69.5);
+  }
+}
+
+/* ---------- player bolts (Krasue Fire) ---------- */
+const PBolts = { list: [] };
+function spawnPlayerBolt(x, y, z, tx, ty, tz) {
+  const m = new THREE.Mesh(sphGeo(.09, 0xffc040, 6),
+    new THREE.MeshBasicMaterial({ color: 0xffc040 }));
+  m.position.set(x, y, z);
+  const dx = tx - x, dy = ty - y, dz = tz - z;
+  const dist = Math.max(.001, Math.sqrt(dx * dx + dy * dy + dz * dz));
+  const spd = 11;
+  PBolts.list.push({
+    mesh: m, life: 2, dmg: 16 + (P_player.upDmg || 0) * 2 + (P_player.emberBlade ? 5 : 0),
+    vx: dx / dist * spd, vy: dy / dist * spd + dist * .1, vz: dz / dist * spd
+  });
+  W3.scene.add(m);
+}
+function updateBolts(dt) {
+  for (let i = PBolts.list.length - 1; i >= 0; i--) {
+    const b = PBolts.list[i], p = b.mesh.position;
+    b.life -= dt;
+    b.vy -= 1.6 * dt;
+    p.x += b.vx * dt; p.y += b.vy * dt; p.z += b.vz * dt;
+    Particles.burst(p.x, p.y, p.z, 1,
+      { color: [0xffc040, 0xffa040, 0xff6a30], spdMin: 0, spdMax: .3, sMax: .05, lifeMax: .3, grav: 0 });
+    let hit = null;
+    for (const f of Foes.list) {
+      if (f.dead) continue;
+      const fp = f.root.position;
+      if (Math.hypot(p.x - fp.x, p.y - (fp.y + (f.k.fly ? f.hover + 1.3 : 1)), p.z - fp.z) < (f.k.hitR * .8)) { hit = f; break; }
+    }
+    if (hit) {
+      damageFoe(hit, b.dmg, new THREE.Vector3(b.vx, 0, b.vz).normalize());
+      Particles.burst(p.x, p.y, p.z, 12,
+        { color: [0xffc040, 0xffd76b, 0xff6a30], spdMin: .6, spdMax: 2.4, sMax: .08, lifeMax: .55, grav: -4 });
+    }
+    if (hit || b.life <= 0 || p.y < groundY(p.x, p.z) + .05) {
+      W3.scene.remove(b.mesh);
+      PBolts.list.splice(i, 1);
+    }
+  }
+}
+
 const QUEST = {
   /* 0 talk to Chantria · 1 slay 6 · 2 return · 3 ch1 clear
      4 ember hunt · 5 return to forge · 6 ch2 clear
      7 priestess hunt · 8 rite at Sokha's · 9 slay the Queen
-     10 verse to Chantria · 11 ch3 clear */
+     10 verse to Chantria · 11 ch3 clear
+     12 light the braziers · 13 hear Sovanna · 14 slay Krong Pali
+     15 confront Vossandei · 16 slay the Whisperer
+     17 song to Chantria · 18 the Wedding Song (dawn — peace) */
   phase: 0,
   killsNeeded: 6,
   embers: 0, embersNeeded: 3,
   priests: 0, priestsNeeded: 3,
+  braziers: 0, braziersNeeded: 3,
   title: "The Drowned Rice Fields",
   sub: "CLEAR NIGHT · CHAPTER 1"
 };
@@ -7795,6 +8321,36 @@ function questOnKill(f) {
     rewardPlayer(120, 80);
     SFX.levelup();
     hudQuote("In the crown's ashes a strip of silk holds a verse that hums against your teeth. The wall's dancer must hear it.", "THE THIRD VERSE");
+  } else if (QUEST.phase === 14 && f.kind === "krongpali") {
+    /* the giant of the gate salutes at last */
+    QUEST.phase = 15;
+    P_player.relics.push({ name: "Iron Staff of Lok Ta", v: 60 });
+    hudUpdateVitals();
+    hudQuest();
+    rewardPlayer(90, 60);
+    SFX.levelup();
+    hudQuote("The giant straightens his greatcoat and salutes — a soldier's discipline — then dissolves into river-light. By the face tower, a white robe is waiting.", "KRONG PALI FALLS");
+    setTimeout(() => { if (QUEST.phase === 15 && W3.state === "play") spawnFoe("vossandei", 27.5, 66.5); }, 4000);
+  } else if (QUEST.phase === 15 && f.kind === "vossandei") {
+    /* the kru's robes fall empty; the thing he served collects its choir */
+    QUEST.phase = 16;
+    P_player.relics.push({ name: "The Stolen Verses", v: 70 });
+    hudUpdateVitals();
+    hudQuest();
+    rewardPlayer(110, 70);
+    camShake(.3);
+    SFX.wail();
+    hudQuote("The kru's robes fall empty and the flooded gallery BOILS — the thing he served has come to collect its choir. Chantria's voice reaches you even here: she will teach you the oldest step. Press 4.", "THE WHISPERER RISES");
+    setTimeout(() => { if (QUEST.phase === 16 && W3.state === "play") spawnFoe("whisperer", 10, 70); }, 4500);
+  } else if (QUEST.phase === 16 && f.kind === "whisperer") {
+    /* the mask breaks; every stolen verse comes loose at once */
+    QUEST.phase = 17;
+    P_player.relics.push({ name: "The Ward-Song, whole", v: 100 });
+    hudUpdateVitals();
+    hudQuest();
+    rewardPlayer(150, 90);
+    SFX.levelup();
+    hudQuote("The serpent unspools into gold mist — and the mist HUMS. Every verse of the ward-song, whole, waiting on your tongue. Chantria must hear it sung.", "THE SONG RELEASED");
   }
 }
 
@@ -7865,6 +8421,32 @@ function questBeat(speaker) {
       "...there. The stones drink it like rain after drought. The wall stands double-thick tonight.",
       "Chapter three is yours. But the humming hasn't stopped — it moved. Under paddy five. The sunken temple is singing YOUR name now."],
     cb: questCourtComplete };
+  if (speaker === "Chantria" && ph === 11) return {
+    lines: [
+      "The wall stands double-thick — and still the stones whisper toward the northeast. Toward paddy five.",
+      "The sunken temple is singing YOUR name, little blade. It wants the dagger — the dagger that remembers your mother's hands.",
+      "Take the causeway east of the Hanging Tree, past the flooded gallery, up the west ramp. Light the three nāga braziers on the terrace — a temple cannot hide from its own fire.",
+      "The dead inside were good people once. Feed them rice if you must. And come back — I have not taught you everything I know."],
+    cb: questStartTemple };
+  if (speaker === "Sovanna Maccha" && ph === 13) return {
+    lines: [
+      "You lit the braziers. My queen — the nāga herself — bows her drowned head to you, dagger-bearer.",
+      "I am Sovanna Maccha, the lesser golden mermaid. I swim for the nāga queen, and I carried messages between her and your mother, once.",
+      "Vossandei did not take the song alone. The temple opened FOR him — a door was held. Watch the door, not just the man.",
+      "His giant guards the gate gallery — Krong Pali, who marched one war too far. He was kind, they say. Be swift, and be merciful.",
+      "And take my gift: the coil. My mothers' way of holding what they love — even the dead can be held still."],
+    cb: questNeakCoil };
+  if (speaker === "Sovanna Maccha" && ph === 14) return {
+    lines: ["The giant of the gate gallery is marching. He salutes no one now — not even the moon.", "When he winds up his slam, coil him. Even mountains can be held."],
+    cb: null };
+  if (speaker === "Chantria" && ph === 17) return {
+    lines: [
+      "You're humming. Do you know you're humming? THE SONG. All of it. Every verse.",
+      "Then stand in the circle, little blade. My hands and yours — the wall gets the song back tonight.",
+      "...oh. Oh, of course. The ward-song was never a WAR song. It's a wedding song. Preah Thong's procession to Neang Neak — the oldest marriage, the one that founded the Khmer. The nāga sang it to bind two peoples into one.",
+      "That is why it holds the wall. A wall is only a village saying: we belong to each other. Sing it with me.",
+      "...the stones are drinking it in. The well is ringing. Bopha — look east. The sky is turning the color of morning rice."],
+    cb: questFinale };
   return null;
 }
 
@@ -7931,6 +8513,55 @@ function questCourtComplete() {
   }, 7000);
 }
 
+/* ---------- chapter 4: the sunken temple ---------- */
+function questStartTemple() {
+  QUEST.phase = 12;
+  QUEST.braziers = 0;
+  hudQuest();
+  WEATHER.force("mist");
+  SFX.wail();
+  hudQuote("The causeway east of the Hanging Tree leads to the drowned gallery. Go northeast — light the three nāga braziers on the temple terrace.", "CHAPTER 4 — THE SUNKEN TEMPLE");
+  /* the road there is walked by the temple's dead */
+  setTimeout(() => {
+    if (QUEST.phase === 12 && W3.state === "play") {
+      spawnFoe("drowned", 12, 52);
+      spawnFoe("naga", 16, 58);
+    }
+  }, 2400);
+}
+function questNeakCoil() {
+  QUEST.phase = 14;
+  hudQuest();
+  SFX.wail();
+  camShake(.14);
+  hudQuote("The gate gallery thuds like a slow drum. KRONG PALI is marching.", "THE GIANT OF THE GATE");
+  spawnFoe("krongpali", 16.5, 66);
+}
+/* ---------- chapter 6: the Wedding Song — dawn over Sambok Chas ---------- */
+function questFinale() {
+  QUEST.phase = 18;
+  QUEST.title = "The Wedding Song";
+  hudQuest();
+  /* the night finally ends: no more waves, and the standing dead rest */
+  Foes.waveActive = false;
+  Foes.queue = [];
+  for (const f of Foes.list) {
+    if (!f.dead) { f.hp = 0; f.dead = true; f.dissolve = 0; }
+  }
+  WEATHER.force("clear");
+  const tag = document.getElementById("clockTag");
+  if (tag) tag.textContent = "Dawn";
+  SFX.levelup();
+  SFX.bell();
+  rewardPlayer(120, 100);
+  P_player.relics.push({ name: "Preah Thong's Krama", v: 90 });
+  hudUpdateVitals();
+  setTimeout(() => {
+    if (QUEST.phase === 18 && W3.state === "play")
+      hudQuote("The ward-song is sung whole. The wall no longer holds the dead OUT — it holds the village IN, the way a wedding holds two families. Sambok Chas rests.", "CHAPTER 6 — THE WEDDING SONG");
+  }, 9000);
+}
+
 /* death recovery: the court does not adjourn because Bopha fell */
 function questRespawnFoes() {
   if (QUEST.phase === 7) {
@@ -7944,18 +8575,30 @@ function questRespawnFoes() {
   } else if (QUEST.phase === 9 && !Foes.list.some(f => !f.dead && f.kind === "queen")) {
     hudQuote("The candles relight one by one. The Queen's audience is NOT concluded.", "THE QUEEN RETURNS");
     spawnFoe("queen", COURT_ARENA.x + 1.5, COURT_ARENA.z - 1.5);
+  } else if (QUEST.phase === 14 && !Foes.list.some(f => !f.dead && f.kind === "krongpali")) {
+    hudQuote("The slow drum never stopped. The giant of the gate marches again.", "KRONG PALI RETURNS");
+    spawnFoe("krongpali", 16.5, 66);
+  } else if (QUEST.phase === 15 && !Foes.list.some(f => !f.dead && f.kind === "vossandei")) {
+    hudQuote("The white robe is still waiting by the face tower.", "THE KRU WAITS");
+    spawnFoe("vossandei", 27.5, 66.5);
+  } else if (QUEST.phase === 16 && !Foes.list.some(f => !f.dead && f.kind === "whisperer")) {
+    hudQuote("The gallery boils again. The Whisperer has not finished listening.", "THE WHISPERER RETURNS");
+    spawnFoe("whisperer", 10, 70);
   }
 }
 function onWaveCleared() {
   if (QUEST.phase === 1 && Foes.kills < QUEST.killsNeeded) {
     hudQuote("The bell quiets… then the reeds move again.", "WAVE " + (Foes.wave + 1) + " INCOMING");
     setTimeout(() => { if (QUEST.phase === 1) startWave(Foes.wave + 1); }, 2600);
-  } else if (QUEST.phase >= 2) {
+  } else if (QUEST.phase >= 2 && QUEST.phase < 18) {
     /* endless night: after the hunt, the fields never empty again */
     hudQuote("The bell quiets… the night only deepens.", "NIGHT " + (Foes.wave + 1));
     setTimeout(() => {
       if (W3.state === "play" && !P_player.dead) startWave(Foes.wave + 1);
     }, 5200);
+  } else if (QUEST.phase >= 18) {
+    /* the wedding song: the night finally ends */
+    hudQuote("The bell rings once — gently, the way bells ring at weddings.", "DAWN");
   }
 }
 function questStartHunt() {
@@ -8007,7 +8650,11 @@ const STORY = {
     { n: 3, title: "The Krasue's Court",
       brief: "The hanging witches trade a name for rice-blood: Vossandei was a man once." },
     { n: 4, title: "The Sunken Temple",
-      brief: "Beneath paddy five lie the nāga's bones. Sever the kru — then choose: restore the ward-song, or carry it." }
+      brief: "Beneath paddy five lie the nāga's bones. Light the braziers, hear the mermaid, and unmask the kru who held the door." },
+    { n: 5, title: "The Whisperer",
+      brief: "Krong Pali falls, Vossandei is unmasked — and the thing he called up wears the drowned nāga's stolen face." },
+    { n: 6, title: "The Wedding Song",
+      brief: "The ward-song restored at last: the oldest wedding dance, sung for Preah Thong and Neang Neak. Dawn comes to Sambok Chas." }
   ],
   cast: [
     { name: "Bopha", role: "Ward-orphan. Her mother's dagger hears whispers." },
@@ -8020,7 +8667,10 @@ const STORY = {
     { name: "Tevy", role: "Charm seller. Sells luck that half of it works." },
     { name: "Srey Noch", role: "Grave-girl. Feeds the dead so they stay fed." },
     { name: "Neak Ta", role: "The silent guardian of the flooded fields." },
-    { name: "Kru Vossandei", role: "The Whisperer's kru. He took the ward-song." }
+    { name: "Kru Vossandei", role: "The Whisperer's kru. He took the ward-song." },
+    { name: "Sovanna Maccha", role: "The lesser golden mermaid. She swims for the drowned nāga queen." },
+    { name: "Krong Pali", role: "The giant of the causeway. His war forgot him; he never forgot his post." },
+    { name: "The Whisperer", role: "Older than the temple, older than the song. It wears a stolen face." }
   ],
   sokhaBriefed: false
 };
@@ -8113,7 +8763,72 @@ Object.assign(STORY.lines["Elder Chum"], {
 });
 Object.assign(STORY.lines["Dara"], {
   7: ["The tree lady with the candle-hat! I saw her spit fire at a dog! The dog is fine. I think.", "Teacher says never whisper back. I ONLY whisper back. It's a game."],
-  11: ["You knocked the crown off the sky-lady's head! I counted the candles — NINE!", "The well hums now. I dropped a pebble in and it hummed BACK."]
+  11: ["You knocked the crown off the sky-lady's head! I counted the candles — NINE!", "The well hums now. I dropped a pebble in and it hummed BACK."],
+  12: ["Teacher says the temple is calling your name. Does it know mine? Ask it! Ask it if it knows mine!", "I found a fish bone shaped like a boat. It's for the temple. DON'T tell Teacher."],
+  14: ["The giant marches past my window at night! One step, and the whole house shivers!", "Teacher says giants are just big men who walked too far from home."],
+  16: ["The water went all glowy-violet and the fish came up to WATCH. Fish don't watch!", "If the snake-thing asks, I never whispered anything. I never whispered ANYTHING."],
+  18: ["The sky is ORANGE. At night! Everyone says it's the song. I say it's for my pebble in the well. Probably both."]
+});
+
+/* chapters 4–6 — the temple, the whisperer, the wedding */
+Object.assign(STORY.lines, {
+  "Sovanna Maccha": {
+    0: ["The gallery water hums around your ankles. Something golden sleeps below the surface, coiled like a question.", "The braziers, little blade. The temple cannot hide from its own fire."],
+    12: ["The gallery water hums around your ankles. Something golden sleeps below the surface, coiled like a question.", "The braziers, little blade. The temple cannot hide from its own fire."],
+    14: ["The giant is marching. He was kind, once — they still say so. Be swift.", "When he winds up his slam, coil him. Even mountains can be held."],
+    15: ["The white robe at the face tower — that is the man who held the temple's door open. Why would a door need a man? Ask him.", "His staff charms are grandmother's bones. Free them, little blade."],
+    16: ["The thing in the water is not a nāga. It only WEARS one — my queen's face is a mask it found in the mud. Break the mask.", "The Apsara Blessing is its oldest enemy. The dancer's art was sung over it once, and it still flinches at the rhythm."],
+    17: ["The song is whole. Swim home, dagger-bearer — the water is quiet now, for the first time in three seasons."]
+  },
+  "Srey Noch": {
+    12: ["The temple's dead were loyal. That's worse than hungry — loyal things follow orders forever.", "Leave rice at the causeway. The drowned bakers remember kneading. It quiets them."],
+    14: ["Krong Pali guards the gate. My grandmother said he once carried her whole village across a flood. Now he stands in it.", "Rice won't stop him. He isn't hungry. He's just... still on duty."],
+    16: ["The well hummed VIOLET last night. I dropped a candle in. It came back UNLIT. That's new.", "Whatever the kru called up, it answers when you whisper. So don't."],
+    18: ["The graves are QUIET and I mean properly quiet — like a held breath let go. I slept until noon. My bows match the sunrise."]
+  }
+});
+Object.assign(STORY.lines["Chantria"], {
+  12: ["The causeway east of the Hanging Tree — where the court held its audience. The ramp climbs to the flooded gallery.", "The braziers are the temple's own memory. Light all three and it cannot pretend not to see you."],
+  14: ["A giant walked in that flood once and carried children on his shoulders. Remember that, when you cut him down.", "The coil Sovanna teaches — my dance is its cousin. Hold, then release. Always release."],
+  15: ["Vossandei held the temple's door open. A door held by a MAN. Sokha's rite heard 'we only borrowed his face' — borrowed from WHO, Bopha?"],
+  16: ["It wears a drowned nāga's face. And it flinches at my rhythm — the Apsara Blessing, key 4, burn it into your hands.", "Stand IN the circle when you dance. The step holds its own ground."],
+  17: ["You're humming the whole song — I can hear it from the shrine. Come. Both our hands, one circle.", "A wedding song held this wall all along. Imagine that: the strongest ward ever sung was a marriage."]
+});
+Object.assign(STORY.lines["Kru Sokha"], {
+  12: ["Under paddy five the water hums your name — and my sachets won't stop trembling. Take poultices. Two. No — three.", "The temple's dead were bakers and drummers. Feed them rice; wounds you'll bind yourself."],
+  14: ["Krong Pali? The giant who carried the village across the flood. My grandmother was one of the children on his shoulders.", "Be merciful if you can. And come back to me AFTER — grief binds wounds slower than lotus."],
+  16: ["The Whisperer wears a stolen face. So did the Queen. So, at the end, did Vossandei. There's a pattern, and I don't like it.", "The dancer's art is its enemy — my rite heard it flinch at rhythm. Chantria knows. Press 4 and mean it."],
+  18: ["Dawn. I haven't said that word in three seasons. The song worked because it was never a weapon — it was a promise.", "Your mother sang it at weddings, did you know? She sang it at OURS, once, before you were born."]
+});
+Object.assign(STORY.lines["Smith Veasna"], {
+  12: ["The temple gallery — that's where the old road climbs. My grandfather cut the ramp stones. They'll hold your weight, and your temper.", "Ember-steel under water: the blade will steam. Let it. It's learning the second half of fire."],
+  14: ["The giant of the gate. I forged horseshoes for his boots' REMEMBERED horses — my grandfather did, anyway. Family trade, family ghosts.", "Strike the coat, not the helmet. The helmet's doctrine. The coat is the man."],
+  16: ["The Whisperer — so the kru was holding the door from the INSIDE. Iron in a fire doesn't blame the hand that forged it, but I do.", "Come sharpen everything after. I mean everything. Dawn is coming and we'll need it."],
+  18: ["Dawn. My forge looks small in daylight. That's all right. So does everything true."]
+});
+Object.assign(STORY.lines["Warden Kralanh"], {
+  12: ["The causeway east — I don't patrol past the Hanging Tree. The stones there remember a different post.", "Braziers: the temple's own memory. Light them and the temple must see you plainly."],
+  14: ["Krong Pali. My list has a page for him — one line, sixty years old: 'still marching.' You'll close it.", "A soldier's ghost keeps a soldier's rhythm. Break the rhythm."],
+  16: ["The Whisperer wears a drowned nāga's face — that's why the gate's song twisted. It's been impersonating our guardian since the drowning.", "Dawn's coming. The gate will want to see it. So will I."],
+  18: ["The gate stood all night and the bell rang like a wedding. I counted NOTHING at dusk. Nothing. First time in three seasons."]
+});
+Object.assign(STORY.lines["Srey"], {
+  12: ["Everything I never managed to buy is under paddy five — and now you're going to LOOK at it. Noble. Terrible. Both.", "Reliquaries in the gallery. Bring me what you don't keep. Quietly."],
+  14: ["Krong Pali's pay-pouch is still in his coat. Sixty years of soldier's wages. Yes, I know whose pocket it should return to. Yes, I'll broker it."],
+  16: ["Court gold was cursed. Temple gold is worse — it RINGS wrong. Sell it to me anyway; I know a shrine that melts curses."],
+  18: ["Dawn prices are honest prices. Even I can't cheat the sunrise. One last mark-up, then the market changes forever."]
+});
+Object.assign(STORY.lines["Elder Chum"], {
+  12: ["The temple was OLD when my grandmother was young. It remembers every hand that lit a fire in it. Light the braziers — it will remember yours kindly."],
+  14: ["Krong Pali carried my village across a flood when I was six. I sat on his shoulder and counted the roofs. Be kind, child. Then be swift."],
+  16: ["The Whisperer is not a ghost. Ghosts were PEOPLE once. That thing is older than people — it only borrows them."],
+  18: ["I heard the whole song in my sleep — the wedding procession, Preah Thong to Neang Neak, the nāga singing her people into one. We are all at that wedding tonight."]
+});
+Object.assign(STORY.lines["Tevy"], {
+  12: ["Going UNDER paddy five? Wet-knot for the climb, dry-knot for the gallery. I invented the dry-knot yesterday. It works. Probably.", "Stock up — Sokha's stall has the healing, mine has the luck. You'll want both."],
+  14: ["The giant? Buy the slow-knot. His slam is a whole argument, and knots win arguments.", "If you fall, I'm buying your rope back at a premium. Don't fall."],
+  16: ["Violet light in the well, whispering in the gallery — for that you need the red knot AND the wet knot AND my whole stall's luck."],
+  18: ["The dawn knot! I tied one the night the queen fell, remember? Look at it now. Look at it. TIED ITSELF."]
 });
 
 /* phase-aware line lookup (falls back to the NPC's static lines) */
@@ -8134,7 +8849,10 @@ const STORY_HOOKS = {
       SFX.coin();
       hudQuote("Sokha presses a gray sachet and fifteen riel into your hand.", "THE HERB-WITCH'S THANKS");
     }
-  }
+    /* her remedies are for sale from chapter 2 on */
+    if (QUEST.phase >= 3) shopOpen("sokha");
+  },
+  "Tevy": () => { if (QUEST.phase >= 1) shopOpen("tevy"); }
 };
 
 /* chronicle — the story-so-far panel in the pause menu */
@@ -9107,9 +9825,215 @@ STORY_HOOKS["Srey"] = () => {
   hudQuote(`Srey weighs ${names} with her thumb, then counts ${total} riel into your palm. ${n} relic${n > 1 ? "s" : ""}, fair prices — she never asks where they came from.`, "THE MERCHANT'S SCALE");
 };
 
+/* ============================================================
+   THE STALLS — Tevy's charms and Sokha's remedies. Items are
+   usable from the item belt (H/C/X/G); gold pays, the dead rest.
+   ============================================================ */
+const SHOPS = {
+  tevy: {
+    title: "THE CHARM STALL",
+    head: "Tevy's rope of knots sways in no wind at all.",
+    goods: [
+      { item: "rice", cost: 5, blurb: "Feed the dead before they feed on you. Wholesale, for friends." },
+      { item: "charm", cost: 16, blurb: "Half of it works. The half that works is the ward half." }
+    ]
+  },
+  sokha: {
+    title: "THE HERB HUT",
+    head: "Sokha weighs her roots by the phase of the moon.",
+    goods: [
+      { item: "poultice", cost: 14, blurb: "Lotus and ginger. Sleep with it on the wound." },
+      { item: "incense", cost: 12, blurb: "The dead show their outlines when it burns. Useful. Also rude." }
+    ]
+  }
+};
+const SHOP = { open: false, which: null };
+let shopEls = null;
+
+function shopOpen(which) {
+  if (!SHOPS[which]) return;
+  SHOP.which = which;
+  SHOP.open = true;
+  const S = SHOPS[which];
+  if (!shopEls) {
+    shopEls = {
+      panel: document.getElementById("shop"),
+      title: document.getElementById("shopTitle"),
+      head: document.getElementById("shopHead"),
+      gold: document.getElementById("shopGoldN"),
+      goods: document.getElementById("shopGoods"),
+      close: document.getElementById("shopCloseBtn")
+    };
+    shopEls.close.addEventListener("click", shopClose);
+  }
+  shopEls.title.textContent = S.title;
+  shopEls.head.childNodes[0].textContent = S.head + "  ";
+  shopEls.panel.classList.add("open");
+  shopRender();
+}
+function shopClose() {
+  SHOP.open = false;
+  if (shopEls) shopEls.panel.classList.remove("open");
+}
+function shopRender() {
+  if (!shopEls || !SHOP.which) return;
+  const S = SHOPS[SHOP.which];
+  shopEls.gold.textContent = P_player.gold;
+  shopEls.goods.innerHTML = S.goods.map(g => {
+    const I = ITEMS[g.item];
+    const own = P_player.inv[g.item] || 0;
+    const afford = P_player.gold >= g.cost;
+    return `<div class="fRow">
+      <div class="fInfo"><b>${I.name}</b><span>${g.blurb} · you carry ${own}</span></div>
+      <button class="fBuy ${afford ? "" : "no"}" data-item="${g.item}" ${afford ? "" : "disabled"}>BUY · ${g.cost}g</button>
+    </div>`;
+  }).join("");
+  for (const b of shopEls.goods.querySelectorAll("button[data-item]"))
+    b.addEventListener("click", () => {
+      const g = S.goods.find(x => x.item === b.dataset.item);
+      if (P_player.gold < g.cost) return;
+      P_player.gold -= g.cost;
+      P_player.inv[g.item] = (P_player.inv[g.item] || 0) + 1;
+      hudUpdateVitals(); SFX.coin();
+      hudQuote(`${g.cost} riel on the board. The ${ITEMS[g.item].name.toLowerCase()} is yours — belt key ${ITEMS[g.item].key.toUpperCase()}.`, "SOLD");
+      shopRender();
+    });
+}
+
 /* ---------- assemble (the prasat + dressing live in temple3d.js) ---------- */
+/* ============================================================
+   CHAPTER 4-5 STORY SET — the sunken temple's terrace: three
+   nāga braziers (the temple's memory), Sovanna Maccha in the
+   drowned gallery, and the reliquaries the looters never got.
+   ============================================================ */
+function buildStoryTemple(scene) {
+  const terraceY = terraceTempleY();
+
+  /* --- the three nāga braziers --- */
+  const BSpots = [[17, 62.5], [27, 62.5], [22, 70.5]];
+  let litCount = 0;
+  for (let i = 0; i < BSpots.length; i++) {
+    const [bx, bz] = BSpots[i];
+    const g = new THREE.Group();
+    const ped = new THREE.Mesh(exploreStone(.5, 1, .5, 0x6e6250, i * 3 + 1), vtoonMat());
+    ped.position.y = .5;
+    const bowl = new THREE.Mesh(cylGeo(.3, .2, .22, 0x3a4258, 9), vtoonMat());
+    bowl.position.y = 1.1;
+    const char = new THREE.Mesh(sphGeo(.14, 0x242830, 8), vtoonMat());
+    char.position.y = 1.26; char.scale.y = .6;
+    g.add(ped, bowl, char);
+    g.position.set(bx, terraceY, bz);
+    scene.add(g);
+    pushCollider(bx, bz, .45);
+    World.interactables.push({
+      name: "Nāga Brazier — the temple's memory", verb: "Light",
+      x: bx, z: bz, r: 1.9,
+      onUse: () => {
+        if (QUEST.phase !== 12) { hudQuote("The brazier already holds its flame — or waits for a colder night.", "THE BRAZIER"); return; }
+        if (g.userData.lit) { hudQuote("This one already burns.", "LIT"); return; }
+        g.userData.lit = true;
+        litCount++;
+        QUEST.braziers = litCount;
+        /* the flame + the temple's own light */
+        const flame = new THREE.Mesh(coneGeo(.16, .5, 0xffa040, 7),
+          new THREE.MeshBasicMaterial({ color: 0xffa040, transparent: true, opacity: .92 }));
+        flame.position.y = 1.55; g.add(flame);
+        const flame2 = new THREE.Mesh(coneGeo(.1, .3, 0xffd76b, 6),
+          new THREE.MeshBasicMaterial({ color: 0xffd76b, transparent: true, opacity: .95 }));
+        flame2.position.y = 1.6; g.add(flame2);
+        g.remove(char);
+        scene.add(wispLight(scene, bx, terraceY + 2.1, bz, 0xffa040, i * 5 + 2));
+        World.updaters.push((dt, t) => {
+          flame.scale.y = 1 + Math.sin(t * 9 + i * 2) * .16;
+          flame2.scale.y = 1 + Math.sin(t * 11 + i) * .22;
+          flame.rotation.y += dt * 1.5;
+        });
+        Particles.burst(bx, terraceY + 1.5, bz, 16,
+          { color: [0xffa040, 0xffd76b, 0xfff2c8], spdMin: .3, spdMax: 1.6, sMax: .07, lifeMax: .8, grav: -1.5 });
+        SFX.bell();
+        if (litCount >= QUEST.braziersNeeded) {
+          QUEST.phase = 13;
+          hudQuest();
+          if (World.sovanna) World.sovanna.visible = true;
+          Particles.burst(22, terraceY + 2.2, 66, 40,
+            { color: [0x70e8ff, 0xffd76b, 0xfff2c8], spdMin: .5, spdMax: 2.6, sMax: .09, lifeMax: 1.3, grav: .8 });
+          hudQuote("Three fires answer one another, and the drowned gallery GLOWS — a golden light is rising from the water, humming.", "THE GALLERY LIGHT");
+          SFX.wail();
+        } else {
+          hudQuest();
+          hudQuote(`The brazier takes the flame. ${litCount} of ${QUEST.braziersNeeded} — the temple's memory is waking.`, "THE TEMPLE REMEMBERS");
+        }
+      }
+    });
+  }
+
+  /* --- Sovanna Maccha, the lesser golden mermaid --- */
+  const sv = new THREE.Group();
+  const glowM = (c, o) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o });
+  const torso = new THREE.Mesh(sphGeo(.16, 0xffd76b, 10), glowM(0xffd76b, .75));
+  torso.position.y = 1.1;
+  const head = new THREE.Mesh(sphGeo(.11, 0xfff2c8, 9), glowM(0xfff2c8, .9));
+  head.position.y = 1.32;
+  const hair = new THREE.Mesh(sphGeo(.13, 0xffd76b, 9), glowM(0xffd76b, .5));
+  hair.position.set(0, 1.38, -.04); hair.scale.set(1.1, .9, 1.05);
+  for (let i = 0; i < 5; i++) {
+    const seg = new THREE.Mesh(sphGeo(.11 - i * .012, 0xffc86b, 8), glowM(0xffc86b, .6 - i * .07));
+    seg.position.set(Math.sin(i * 1.1) * .1, .92 - i * .17, -.12 - i * .08);
+    sv.add(seg);
+  }
+  const tailFin = new THREE.Mesh(coneGeo(.1, .3, 0x70e8ff, 6), glowM(0x70e8ff, .5));
+  tailFin.position.set(0, .12, -.55); tailFin.rotation.x = Math.PI / 2.4;
+  sv.add(torso, head, hair, tailFin);
+  sv.position.set(16.5, terraceY, 68.5);
+  sv.visible = QUEST.phase >= 13;
+  scene.add(sv);
+  World.sovanna = sv;
+  scene.add(wispLight(scene, 16.5, terraceY + 1.6, 68.5, 0xffd76b, 12));
+  World.updaters.push((dt, t) => {
+    sv.position.y = terraceY + Math.sin(t * 1.1) * .1;
+    sv.rotation.y = Math.sin(t * .5) * .4;
+  });
+  pushCollider(16.5, 68.5, .5);
+  World.interactables.push({
+    name: "Sovanna Maccha — the golden mermaid", verb: "Speak to",
+    x: 16.5, z: 68.5, r: 2.1
+  });
+
+  /* --- reliquaries the looters never reached --- */
+  lootShrine(scene, {
+    id: "temple_urn", x: 28.2, z: 70.2, name: "Face-Tower Niche",
+    title: "THE FACE-TOWER NICHE",
+    loot: [{ gold: 35 }, { relic: "Nāga Tear", v: 55 }],
+    pickLine: "A monk's begging bowl, stuffed with temple gold nobody came back for — and a teardrop of nāga glass, warm as a held hand.",
+    emptyLine: "The niche holds only dust and the memory of gold.",
+    build: (s2) => {
+      const urn = new THREE.Mesh(cylGeo(.2, .14, .34, 0x8a6f42, 9), envMat("stone"));
+      urn.position.set(s2.x, groundY(s2.x, s2.z) + .17, s2.z);
+      urn.rotation.z = .3;
+      scene.add(urn);
+      scene.add(wispLight(scene, s2.x, groundY(s2.x, s2.z) + .8, s2.z, 0xffd76b, 21));
+    }
+  });
+  lootShrine(scene, {
+    id: "causeway_cairn", x: 9, z: 60, name: "Causeway Cairn",
+    title: "THE CAUSEWAY CAIRN",
+    loot: [{ gold: 22 }, { relic: "Drowned Bell Clapper", v: 35 }],
+    pickLine: "Beneath stacked river stones: a bell clapper — the bell drowned with its tower — and a rice-farmer's rainy-day pouch.",
+    emptyLine: "Only wet stones now.",
+    build: (s2) => {
+      for (let i = 0; i < 4; i++) {
+        const st = new THREE.Mesh(exploreStone(.3, .24, .3, 0x5c6258, i * 7 + 3), vtoonMat());
+        st.position.set(s2.x + (hash2(i, 1) - .5) * .5, groundY(s2.x, s2.z) + .12 + i * .12, s2.z + (hash2(i, 2) - .5) * .5);
+        st.rotation.y = hash2(i, 3) * 3;
+        scene.add(st);
+      }
+    }
+  });
+}
+
 function buildExplore(scene) {
   buildPrasat(scene);
+  buildStoryTemple(scene);
   buildLandmarks(scene);
   buildHiddenPlaces(scene);
   buildClimbHomes(scene);
@@ -11002,6 +11926,20 @@ function hudInit() {
   HUD.pause = document.getElementById("pausePanel");
   HUD.chronicle = document.getElementById("chronicle");
   HUD.hintbar = document.getElementById("hintbar");
+  /* blessings + item belt */
+  HUD.spirit = document.getElementById("spiritFill");
+  HUD.spellEls = {
+    moonstep: document.getElementById("sp1"),
+    ghostfire: document.getElementById("sp2"),
+    neakcoil: document.getElementById("sp3"),
+    apsara: document.getElementById("sp4")
+  };
+  HUD.itemEls = {
+    poultice: document.getElementById("itH"),
+    incense: document.getElementById("itC"),
+    rice: document.getElementById("itX"),
+    charm: document.getElementById("itG")
+  };
   /* the old item card is archive material — it lives in the chronicle now */
   const card = document.getElementById("itemCard");
   if (card) card.style.display = "none";
@@ -11012,11 +11950,38 @@ function hudInit() {
 function hudUpdateVitals() {
   const p = P_player;
   HUD.hp.style.transform = `scaleX(${clamp(p.hp / p.hpMax, 0, 1)})`;
+  if (HUD.spirit) HUD.spirit.style.transform = `scaleX(${clamp(p.spirit / p.spiritMax, 0, 1)})`;
   HUD.san.style.transform = `scaleX(${clamp(p.sanity / p.sanMax, 0, 1)})`;
   HUD.xp.style.transform = `scaleX(${clamp(p.xp / p.xpNext, 0, 1)})`;
   HUD.lv.textContent = p.lv;
   HUD.gold.textContent = p.gold;
   if (HUD.relic) HUD.relic.textContent = p.relics.length;
+}
+
+/* spell slots + item belt — refreshed every frame in play */
+function hudMagic() {
+  const p = P_player;
+  for (const id in SPELLS) {
+    const el = HUD.spellEls && HUD.spellEls[id];
+    if (!el) continue;
+    const S = SPELLS[id];
+    const locked = QUEST.phase < S.unlock;
+    const cd = p.spellCd[id] || 0;
+    el.classList.toggle("locked", locked);
+    el.classList.toggle("starved", !locked && p.spirit < S.cost);
+    const fill = el.querySelector(".cdFill");
+    if (fill) fill.style.height = (!locked && cd > 0 ? (cd / S.cd) * 100 : 0) + "%";
+    el.title = locked ? "Learned as the story unfolds — " + S.tip : S.tip;
+  }
+  for (const id in ITEMS) {
+    const el = HUD.itemEls && HUD.itemEls[id];
+    if (!el) continue;
+    const n = p.inv[id] || 0;
+    el.classList.toggle("empty", n <= 0);
+    const ct = el.querySelector(".ct");
+    if (ct) ct.textContent = "×" + n;
+    el.title = ITEMS[id].tip;
+  }
 }
 
 /* quest — one living line; the full list only on hover */
@@ -11073,11 +12038,40 @@ function hudQuest() {
     items.push(["Chapter 1 cleared.", true], ["Chapter 2 cleared — the ember blade.", true],
       ["Slay the court priestesses.", true], ["The Queen is felled — the verse recovered.", true], [now, false]);
     meta = "KEENING WIND · CHAPTER 3";
-  } else {
-    now = "Chapter 3 cleared — beneath paddy five, the sunken temple sings your name.";
-    items.push(["Chapter 1 cleared.", true], ["Chapter 2 cleared — the ember blade.", true],
-      ["Chapter 3 cleared — the Queen felled, the verse restored.", true], [now, false]);
-    meta = "EMBER NIGHT · CHAPTER 3 CLEARED";
+  } else if (q.phase === 12) {
+    now = `Light the three nāga braziers on the sunken temple's terrace — ${q.braziers}/${q.braziersNeeded}.`;
+    items.push(["Chapter 3 cleared — the verse restored.", true],
+      ["Follow the causeway northeast, past the Hanging Tree.", true],
+      ["Climb the west ramp to the flooded temple.", false], [now, false]);
+    meta = "SUNKEN MOON · CHAPTER 4";
+  } else if (q.phase === 13) {
+    now = "Speak with the golden light in the drowned gallery.";
+    items.push(["The braziers burn.", true], [now, false]);
+    meta = "SUNKEN MOON · CHAPTER 4";
+  } else if (q.phase === 14) {
+    now = "Face Krong Pali, the giant of the gate gallery.";
+    items.push(["The braziers burn.", true], ["Sovanna Maccha taught you the coil.", true], [now, false]);
+    meta = "SUNKEN MOON · CHAPTER 4 — THE GIANT";
+  } else if (q.phase === 15) {
+    now = "Confront Kru Vossandei at the face tower, east end of the terrace.";
+    items.push(["Krong Pali salutes and rests.", true], [now, false]);
+    meta = "SUNKEN MOON · CHAPTER 4 — THE KRU";
+  } else if (q.phase === 16) {
+    now = "The Whisperer has risen in the flooded gallery. End it.";
+    items.push(["Vossandei's robes fell empty.", true],
+      ["Chantria taught you the Apsara Blessing.", true], [now, false]);
+    meta = "THE FLOODED DARK · CHAPTER 5";
+  } else if (q.phase === 17) {
+    now = "Carry the whole ward-song back to Chantria at the shrine.";
+    items.push(["The Whisperer is unspooled.", true],
+      ["The song hums whole on your tongue.", true], [now, false]);
+    meta = "THE FLOODED DARK · CHAPTER 5 CLEARED";
+  } else if (q.phase >= 18) {
+    now = "The wedding song is sung. Sambok Chas sleeps — and so can you.";
+    items.push(["Chapter 4 — the temple, the giant, the kru.", true],
+      ["Chapter 5 — the Whisperer unspooled.", true],
+      ["Chapter 6 — the Wedding Song: dawn over the drowned village.", true]);
+    meta = "DAWN · SAMBOK CHAS RESTS";
   }
   HUD.questNow.textContent = now;
   HUD.questMeta.textContent = meta;
@@ -11151,8 +12145,8 @@ function hudUpdateFx(dt) {
   /* low hp vignette */
   const lowHp = p.hp / p.hpMax < .38 ? (1 - p.hp / p.hpMax) * 1.15 : 0;
   HUD.vignette.style.opacity = lowHp;
-  /* curse vision or low sanity — fog itself is WEATHER's job now */
-  const curse = !!W3.keys.v || p.sanity / p.sanMax < .3;
+  /* curse vision, incense sight, or low sanity — fog itself is WEATHER's job now */
+  const curse = !!W3.keys.v || p.sightT > 0 || p.sanity / p.sanMax < .3;
   if (curse !== !!W3.curseOn) {
     W3.curseOn = curse;
     for (const f of Foes.list) if (f.kind === "wraith" && !f.dead)
@@ -11582,6 +12576,7 @@ function loop() {
   if (W3.state === "play" || W3.state === "pause" || W3.state === "dead") {
     if (W3.keysOnce.p || W3.keysOnce.Esc || W3.keysOnce.Tab) {
       if (FORGE.open) forgeClose();                   /* ESC closes the forge first */
+      else if (SHOP.open) shopClose();                /* then the stalls */
       else if (MAPSYS.open) MAPSYS.hide();            /* ESC/M close the map next */
       else if (W3.state !== "dead") hudTogglePause();
     }
@@ -11590,17 +12585,20 @@ function loop() {
     }
   }
 
-  if (W3.state === "play" && !MAPSYS.open && !FORGE.open) {
+  if (W3.state === "play" && !MAPSYS.open && !FORGE.open && !SHOP.open) {
     updateBopha(dt);
     updateFoes(dt);
     updateSpits(dt);
     updateSpawner(dt);
     updateOrbs(dt);
     updateEmbers(dt);
+    updateMagic(dt);
+    updateBolts(dt);
     updateWorld(dt);
     handleInteract(dt);
     hudComboUpdate(dt);
     hudUpdateFx(dt);
+    hudMagic();
     SFX.heartbeat(dt);
     wailTimer -= dt;
     if (wailTimer <= 0) {
