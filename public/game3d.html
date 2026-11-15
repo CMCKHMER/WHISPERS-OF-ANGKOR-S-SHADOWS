@@ -3033,7 +3033,7 @@ function forestDensity(x, z) {
 const MOON_DIR = new THREE.Vector3(-18, 26, -12).normalize();
 
 function buildSkyLights(scene) {
-  scene.fog = new THREE.FogExp2(0x0a141d, 0.0195);
+  scene.fog = new THREE.FogExp2(0x0d1926, 0.0168);
 
   const hemi = new THREE.HemisphereLight(0x3c5a78, 0x17201a, 0.95);
   scene.add(hemi);
@@ -3062,11 +3062,11 @@ function buildSkyLights(scene) {
         vec3 d = normalize(vP);
         float h = clamp(d.y, -0.3, 1.0);
         vec3 top = vec3(0.010, 0.020, 0.042);
-        vec3 hor = vec3(0.070, 0.105, 0.120);
+        vec3 hor = vec3(0.095, 0.135, 0.150);
         vec3 col = mix(hor, top, smoothstep(0.0, 0.42, h));
         float mg = pow(max(dot(d, normalize(vec3(-0.53, 0.62, -0.44))), 0.0), 5.0);
         col += vec3(0.085, 0.115, 0.16) * mg;
-        col = mix(col, vec3(0.035, 0.048, 0.052), smoothstep(-0.02, -0.28, d.y));
+        col = mix(col, vec3(0.045, 0.060, 0.066), smoothstep(-0.02, -0.28, d.y));
         gl_FragColor = vec4(col, 1.0);
       }`
   });
@@ -3074,7 +3074,7 @@ function buildSkyLights(scene) {
 
   /* far ridges ringing the flood plain — low, wide, hazy silhouettes just
      inside the sky dome; jittered so no two crests match */
-  const ridgeMat = new THREE.MeshBasicMaterial({ color: 0x111c26, fog: false });
+  const ridgeMat = new THREE.MeshBasicMaterial({ color: 0x16232e, fog: false });
   const ridgeAt = (a, r, w, h) => {
     const g = new THREE.ConeGeometry(w, h, 7, 1);
     const p = g.attributes.position;
@@ -3972,9 +3972,21 @@ function gradY(geo, c1, c2, h) {
 const FOREST_TREES = [];
 const LOG_SPOTS = [];
 
+/* root mound — a squat cushion of dark earth every trunk rises out of.
+   Without it, bases vanish against night terrain and trees read as floating. */
+function rootMound(bk, x, z, gy, s) {
+  const rr = rand(0.4, 0.62) * s;
+  const g = coneGeo(rr, rr * 0.5, 0xffffff, 7);
+  jitterGeo(g, rr * 0.18, (x * 3.1 + z * 7.7) % 97);
+  setVertColor(g, new THREE.Color(0x2e2517).multiplyScalar(rand(0.85, 1.15)));
+  g.translate(x, gy + rr * 0.2, z);
+  bk.trunk.push(g);
+}
+
 /* ---------- broadleaf: bent trunk, root flare, blob canopy ---------- */
 function treeBroad(bk, x, z, s) {
-  const gy = groundY(x, z);
+  let gy = groundY(x, z) - 0.05;
+  rootMound(bk, x, z, gy, s);
   const A = rand(0, TAU), la = rand(0.03, 0.13);
   const ca = Math.cos(A), sa = Math.sin(A);
   const rb = rand(0.15, 0.23) * s;
@@ -4033,7 +4045,8 @@ function treeBroad(bk, x, z, s) {
 
 /* ---------- sugar palm: tall ringed trunk + fan of drooping fronds ---------- */
 function treePalm(bk, x, z, s) {
-  const gy = groundY(x, z);
+  let gy = groundY(x, z) - 0.07;
+  rootMound(bk, x, z, gy, s * 0.85);
   const H = rand(4.4, 6.2) * s;
   const nS = 5, segH = H / nS;
   const leanA = rand(0, TAU), lean = rand(0.015, 0.07);
@@ -4080,7 +4093,8 @@ function treePalm(bk, x, z, s) {
 
 /* ---------- kapok: the great canopy tree, buttressed and old ---------- */
 function treeKapok(bk, x, z, s) {
-  const gy = groundY(x, z);
+  let gy = groundY(x, z) - 0.06;
+  rootMound(bk, x, z, gy, s * 1.35);
   const col = new THREE.Color(0x3a2c1e).multiplyScalar(rand(0.85, 1.1));
   const H = rand(4.6, 6.4) * s, rb = rand(0.3, 0.42) * s;
   const leanA = rand(0, TAU), lean = rand(0.01, 0.045);
@@ -4130,7 +4144,8 @@ function treeKapok(bk, x, z, s) {
 
 /* ---------- dead snag: bare twisted branches ---------- */
 function treeDead(bk, x, z, s) {
-  const gy = groundY(x, z);
+  let gy = groundY(x, z) - 0.06;
+  rootMound(bk, x, z, gy, s * 0.8);
   const col = 0x4a4038;
   const leanA = rand(0, TAU);
   const g = cylGeo(0.13 * s, 0.2 * s, 2.6 * s, col, 6);
@@ -4153,7 +4168,8 @@ function treeDead(bk, x, z, s) {
 /* ---------- mango — svay, the tree of every Khmer yard: smooth
    grey trunk, dense dark dome, heavy with hanging fruit ---------- */
 function treeMango(bk, x, z, s) {
-  const gy = groundY(x, z);
+  let gy = groundY(x, z) - 0.05;
+  rootMound(bk, x, z, gy, s * 0.95);
   const col = new THREE.Color(0x585048).multiplyScalar(rand(0.9, 1.08));
   const H = rand(2.0, 2.7) * s, rb = rand(0.16, 0.22) * s;
   const leanA = rand(0, TAU), lean = rand(0.02, 0.09);
@@ -4212,7 +4228,8 @@ function treeMango(bk, x, z, s) {
 /* ---------- coconut palm — jtek: curved grey trunk, arching
    bright fronds that droop hard, nuts tucked in the crown ---------- */
 function treeCoconut(bk, x, z, s) {
-  const gy = groundY(x, z);
+  let gy = groundY(x, z) - 0.07;
+  rootMound(bk, x, z, gy, s * 0.9);
   const H = rand(4.8, 6.6) * s;
   const nS = 6, segH = H / nS;
   const leanA = rand(0, TAU), lean = rand(0.05, 0.13);
@@ -4259,7 +4276,8 @@ function treeCoconut(bk, x, z, s) {
    succulent forks, sparse crowns, white-gold blossom rosettes.
    Planted beside every Khmer shrine; the spirits keep them. ---------- */
 function treeFrangipani(bk, x, z, s) {
-  const gy = groundY(x, z);
+  let gy = groundY(x, z) - 0.05;
+  rootMound(bk, x, z, gy, s * 1.1);
   const col = new THREE.Color(0x4e4a44).multiplyScalar(rand(0.92, 1.06));
   const H = rand(1.5, 2.1) * s, rb = rand(0.14, 0.2) * s;
   const trunk = cylGeo(rb * 0.85, rb, H, col, 8);
@@ -4319,7 +4337,8 @@ function treeFrangipani(bk, x, z, s) {
 /* ---------- papaya — lahong: thin bare trunk, burst of big
    drooping leaves, fruit hugging the crown like a belt ---------- */
 function treePapaya(bk, x, z, s) {
-  const gy = groundY(x, z);
+  let gy = groundY(x, z) - 0.04;
+  rootMound(bk, x, z, gy, s * 0.6);
   const H = rand(1.7, 2.4) * s;
   const leanA = rand(0, TAU), lean = rand(0.03, 0.12);
   const col = new THREE.Color(0x6e7a52).multiplyScalar(rand(0.9, 1.05));
@@ -4361,7 +4380,8 @@ function treePapaya(bk, x, z, s) {
 /* ---------- batched banana plant for groves — same silhouette
    as bananaAt but merged: a village grove costs no draw calls ---------- */
 function bananaMerged(bk, x, z, s) {
-  const gy = groundY(x, z);
+  const gy = groundY(x, z) - 0.04;
+  rootMound(bk, x, z, gy, s * 0.55);
   const leanA = rand(0, TAU), lean = rand(0.02, 0.1);
   const stem = cylGeo(0.06 * s, 0.1 * s, 1.5 * s, 0x4a6a30, 7);
   stem.rotateZ(lean);
@@ -4392,7 +4412,10 @@ function bananaMerged(bk, x, z, s) {
 /* ---------- banana plant (own animated group) ---------- */
 function bananaAt(scene, x, z) {
   const g = new THREE.Group();
-  const gy = groundY(x, z);
+  const gy = groundY(x, z) - 0.04;
+  const mound = new THREE.Mesh(coneGeo(0.3, 0.14, 0x2e2517, 7), TRUNK_M());
+  mound.position.y = 0.05; mound.castShadow = true;
+  g.add(mound);
   const stem = new THREE.Mesh(cylGeo(0.07, 0.11, 1.55, 0x4a6a30, 7), TRUNK_M());
   stem.position.y = 0.77; stem.castShadow = true;
   g.add(stem);
@@ -4449,7 +4472,7 @@ function buildForest(scene) {
   /* the great ones — rare, wide, unmistakable landmarks of the wilds */
   tryPlace(4, (x, z) => treeKapok(bk, x, z, rand(1.25, 1.6)));
   /* densify the near-wilds band just past the wall so the treeline reads solid */
-  for (let i = 0, c = 0; i < 400 && c < 14; i++) {
+  for (let i = 0, c = 0; i < 600 && c < 22; i++) {
     const a = Math.random() * TAU, rr = rand(29, 45);
     const x = Math.sin(a) * rr, z = Math.cos(a) * rr;
     const fd = forestDensity(x, z);
@@ -4600,7 +4623,7 @@ function buildForest(scene) {
     }
     pushCollider(sp.x, sp.z, rr + 0.2);
   }
-  for (let i = 0; i < 14; i++) {
+  for (let i = 0; i < 22; i++) {
     const sp = wildSpot(i < 4 ? 13 : 29, i < 4 ? 24 : 68); if (!sp) continue;
     const gy = groundY(sp.x, sp.z);
     const rr = rand(0.3, 0.75);
@@ -4618,7 +4641,63 @@ function buildForest(scene) {
     g.translate(sp.x, gy + rr * 0.3, sp.z);
     rocks.push(g);
     pushCollider(sp.x, sp.z, rr * 0.9);
+    /* boulder fields come in families — 1-2 weathered siblings alongside */
+    const nSib = Math.random() < 0.55 ? 1 + (Math.random() * 2 | 0) : 0;
+    for (let sI = 0; sI < nSib; sI++) {
+      const sa = rand(0, TAU), sd = rr + rand(0.4, 1.3);
+      const sx2 = sp.x + Math.cos(sa) * sd, sz2 = sp.z + Math.sin(sa) * sd;
+      if (pathDist(sx2, sz2) < 1.5) continue;
+      const rr2 = rr * rand(0.35, 0.62);
+      const gs = jitterGeo(new THREE.DodecahedronGeometry(rr2, 0), rr2 * 0.4, (i + 3.7 + sI) * 2.3);
+      const p2 = gs.attributes.position;
+      const vc2 = new Float32Array(p2.count * 3);
+      for (let vi = 0; vi < p2.count; vi++) {
+        cc.copy(cSt).lerp(cMo, sstep(rr2 * 0.2, -rr2 * 0.5, p2.getY(vi)) * 0.8);
+        vc2[vi * 3] = cc.r; vc2[vi * 3 + 1] = cc.g; vc2[vi * 3 + 2] = cc.b;
+      }
+      gs.setAttribute("color", new THREE.BufferAttribute(vc2, 3));
+      gs.scale(1, rand(0.55, 0.85), rand(0.75, 1.15));
+      gs.rotateY(rand(0, TAU));
+      gs.translate(sx2, groundY(sx2, sz2) + rr2 * 0.28, sz2);
+      rocks.push(gs);
+    }
   }
+
+  /* termite mounds — the red-earth chimneys of every Cambodian field */
+  const termites = [];
+  const termSpot = (rMin, rMax) => {
+    for (let k = 0; k < 30; k++) {
+      const a = Math.random() * TAU, rr = rand(rMin, rMax);
+      const x = Math.sin(a) * rr, z = Math.cos(a) * rr;
+      if (Math.abs(x) < 4.2 && z > 19) continue;
+      if (pathDist(x, z) < 1.6) continue;
+      if (Math.hypot(x, z) < 11) continue;
+      let ok = true;
+      for (const p of PADIES) if (rectDist(x, z, p) < 2.2) { ok = false; break; }
+      if (ok) for (const q of placed) { const dx = q.x - x, dz = q.z - z; if (dx * dx + dz * dz < 4) { ok = false; break; } }
+      if (ok) for (const f of FLATS) if (Math.hypot(x - f.x, z - f.z) < f.r + 1) { ok = false; break; }
+      if (ok) return { x, z };
+    }
+    return null;
+  };
+  for (let i = 0; i < 16; i++) {
+    const sp = termSpot(i < 5 ? 14 : 26, i < 5 ? 27 : 64);
+    if (!sp) continue;
+    const gy = groundY(sp.x, sp.z);
+    const h = rand(0.45, 1.25), rr = rand(0.2, 0.38);
+    const g = jitterGeo(coneGeo(rr, h, 0x5a3d28, 7), rr * 0.22, i * 3.3);
+    g.translate(sp.x, gy + h / 2 - 0.05, sp.z);
+    termites.push(g);
+    /* weathered spout on some — the chimney's old exit */
+    if (Math.random() < 0.6) {
+      const spout = coneGeo(rr * 0.32, rr * 0.9, 0x66462c, 5);
+      spout.rotateZ(rand(-0.35, 0.35));
+      spout.translate(sp.x + rand(-0.08, 0.08), gy + h - rr * 0.28, sp.z + rand(-0.08, 0.08));
+      termites.push(spout);
+    }
+    placed.push({ x: sp.x, z: sp.z });
+  }
+  if (termites.length) { const m = new THREE.Mesh(mergeGeos(termites), TRUNK_M()); m.castShadow = true; m.receiveShadow = true; scene.add(m); }
   if (logs.length) { const m = new THREE.Mesh(mergeGeos(logs), TRUNK_M()); m.castShadow = true; scene.add(m); }
   if (stumps.length) { const m = new THREE.Mesh(mergeGeos(stumps), TRUNK_M()); m.castShadow = true; scene.add(m); }
   if (rocks.length) { const m = new THREE.Mesh(mergeGeos(rocks), TRUNK_M()); m.castShadow = true; m.receiveShadow = true; scene.add(m); }
@@ -4670,7 +4749,7 @@ function buildScatter(scene) {
   })();
   const gSpots = [];
   const cTmp = new THREE.Color();
-  for (let i = 0; i < 5200 && gSpots.length < 2350; i++) {
+  for (let i = 0; i < 6000 && gSpots.length < 2600; i++) {
     const a = Math.random() * TAU, rr = Math.sqrt(Math.random()) * 68;
     const x = Math.sin(a) * rr, z = Math.cos(a) * rr;
     const n = fbm(x * 0.21 + 31, z * 0.21 + 17);
@@ -4718,7 +4797,7 @@ function buildScatter(scene) {
     return mergeGeos(parts);
   })();
   const sSpots = [];
-  for (let i = 0; i < 900 && sSpots.length < 250; i++) {
+  for (let i = 0; i < 1600 && sSpots.length < 420; i++) {
     const a = Math.random() * TAU, rr = rand(28, 66);
     const x = Math.sin(a) * rr, z = Math.cos(a) * rr;
     const fd = forestDensity(x, z);
@@ -4741,7 +4820,7 @@ function buildScatter(scene) {
   })();
   const fSpots = [];
   const fCols = [0xcdd3c2, 0x9a8ab8, 0xc8b878, 0xb8c4d8];
-  for (let i = 0; i < 700 && fSpots.length < 210; i++) {
+  for (let i = 0; i < 900 && fSpots.length < 260; i++) {
     const a = Math.random() * TAU, rr = Math.sqrt(Math.random()) * 55;
     const x = Math.sin(a) * rr, z = Math.cos(a) * rr;
     const pd = pathDist(x, z);
@@ -4765,7 +4844,7 @@ function buildScatter(scene) {
   })();
   const mSpots = [];
   const anchors = [...FOREST_TREES, ...LOG_SPOTS];
-  for (let i = 0; i < 400 && mSpots.length < 130; i++) {
+  for (let i = 0; i < 600 && mSpots.length < 170; i++) {
     const an = anchors[(Math.random() * anchors.length) | 0];
     if (!an) break;
     const x = an.x + rand(-1.4, 1.4), z = an.z + rand(-1.4, 1.4);
@@ -4784,7 +4863,7 @@ function buildScatter(scene) {
     return mergeGeos([g]);
   })();
   const bSpots = [];
-  for (let i = 0; i < 300 && bSpots.length < 85; i++) {
+  for (let i = 0; i < 450 && bSpots.length < 120; i++) {
     const a = Math.random() * TAU, rr = rand(26, 66);
     const x = Math.sin(a) * rr, z = Math.cos(a) * rr;
     if (!openSpot(x, z, { pathGap: 1.4 })) continue;
@@ -4798,7 +4877,7 @@ function buildScatter(scene) {
   const pebbleGeo = jitterGeo(new THREE.DodecahedronGeometry(0.055, 0), 0.035, 5.5);
   setVertColor(pebbleGeo, 0xffffff);
   const pSpots = [];
-  for (let i = 0; i < 500 && pSpots.length < 160; i++) {
+  for (let i = 0; i < 800 && pSpots.length < 240; i++) {
     const a = Math.random() * TAU, rr = Math.sqrt(Math.random()) * 60;
     const x = Math.sin(a) * rr, z = Math.cos(a) * rr;
     if (inWater(x, z)) continue;
@@ -8364,15 +8443,15 @@ const VOICE = (() => {
 
 const WEATHER = (() => {
   const STATES = {
-    clear:   { name: "Clear Night",    fog: .0195, moon: 1.5,  hemi: .95, rain: 0,   wind: .22 },
-    mist:    { name: "River Mist",     fog: .030,  moon: 1.12, hemi: .8,  rain: 0,   wind: .1  },
-    drizzle: { name: "Drizzle",        fog: .0245, moon: .95,  hemi: .85, rain: .38, wind: .5  },
-    squall:  { name: "Monsoon Squall", fog: .037,  moon: .45,  hemi: .62, rain: 1,   wind: 1,  thunder: true }
+    clear:   { name: "Clear Night",    fog: .0168, moon: 1.5,  hemi: .95, rain: 0,   wind: .22 },
+    mist:    { name: "River Mist",     fog: .027,  moon: 1.12, hemi: .8,  rain: 0,   wind: .1  },
+    drizzle: { name: "Drizzle",        fog: .0215, moon: .95,  hemi: .85, rain: .38, wind: .5  },
+    squall:  { name: "Monsoon Squall", fog: .034,  moon: .45,  hemi: .62, rain: 1,   wind: 1,  thunder: true }
   };
 
   const W = {
     state: "clear", timer: 80,
-    rain: 0, wind: .22, fog: .0195, moon: 1.5, hemi: .95,
+    rain: 0, wind: .22, fog: .0168, moon: 1.5, hemi: .95,
     bolt: 0, boltT: 9, boltGlow: 0,
     started: false
   };
@@ -8628,9 +8707,12 @@ function groundMist(scene, x, z, s = 1) {
   });
 }
 function charmStrip(scene, x, y, z, len, seed, col) {
-  const m = new THREE.Mesh(plankGeo(.1, len, .016, col, seed, 1),
-    vtoonMat());
-  m.geometry.translate(0, -len / 2, 0);
+  /* geometry is baked vertical (plankGeo's long axis Z -> world Y) so the
+     strip HANGS from its tie point; mesh euler flutter stays pendulum-like */
+  const g = plankGeo(.1, len, .016, col, seed, 1);
+  g.rotateX(-Math.PI / 2);
+  g.translate(0, -len / 2, 0);
+  const m = new THREE.Mesh(g, vtoonMat());
   m.position.set(x, y, z);
   m.rotation.y = rand(0, TAU);
   scene.add(m);
@@ -8824,13 +8906,13 @@ function buildHiddenPlaces(scene) {
   const tree = deadTree(scene, HX, HZ, 2.1, 33);
   const gy = groundY(HX, HZ);
   for (let i = 0; i < 9; i++) {
-    const a = hash2(i, 8) * TAU, rr = 1.2 + hash2(i, 12) * 1.6;
+    const a = hash2(i, 8) * TAU, rr = 0.8 + hash2(i, 12) * 1.3;
     const cx = HX + Math.cos(a) * rr, cz = HZ + Math.sin(a) * rr;
-    charmStrip(scene, cx, gy + 2.6 + hash2(i, 5) * 1.3, cz, .8 + hash2(i, 2) * .9, i * 2.3,
+    charmStrip(scene, cx, gy + 3.6 + hash2(i, 5) * 2.2, cz, .8 + hash2(i, 2) * .9, i * 2.3,
       i % 3 === 0 ? tint(0x8e1622, .8, 1.1) : tint(0x8a8272, .7, 1));
     if (i % 3 === 0) {
       const bundle = new THREE.Mesh(sphGeo(.11, tint(0x5c5346, .8, 1), 6), vtoonMat());
-      bundle.position.set(cx, gy + 2.5 + hash2(i, 5) * 1.3, cz);
+      bundle.position.set(cx, gy + 3.5 + hash2(i, 5) * 2.2, cz);
       scene.add(bundle);
     }
   }
@@ -10023,7 +10105,7 @@ function buildWildDressing(scene) {
   })();
   const fSpots = [];
   const onTerrace = (x, z) => Math.abs(x - 22) < 9 && Math.abs(z - 66) < 7;
-  for (let i = 0; i < 900 && fSpots.length < 170; i++) {
+  for (let i = 0; i < 1500 && fSpots.length < 300; i++) {
     let x, z, n = Math.random();
     if (n < .3) { x = rand(12, 33); z = rand(53, 78); }            /* temple courts */
     else if (n < .5) { x = rand(-34, -20); z = rand(-27, -13); }   /* banyan woods */
@@ -10090,7 +10172,7 @@ function buildWildDressing(scene) {
     setVertColor(leafG, 0xffffff);
     const lSpots = [];
     const lCols = [0x8a6a3a, 0x6a5230, 0x9a7a44, 0x54422a, 0x7a5c34].map(c => new THREE.Color(c));
-    for (let i = 0; i < 1400 && lSpots.length < 340; i++) {
+    for (let i = 0; i < 2200 && lSpots.length < 520; i++) {
       let x, z;
       const n = Math.random();
       if (n < .3) { x = rand(12, 33); z = rand(53, 78); }
@@ -10155,6 +10237,82 @@ function buildWildDressing(scene) {
       cd.position.set(ax + rand(-.5, .5), gy + .03, az + rand(-.5, .5));
       scene.add(cd);
     }
+  }
+
+  /* ---------- THE KRASUE COURT'S AUDITORIUM — east field, around the
+     Hanging Tree: wax stubs where the audience sits, offering posts the
+     priests still tie ribbons to. Unlit until chapter 3 gathers them. ---------- */
+  {
+    const HX = 39, HZ = 30;
+    const wax = [];
+    for (let i = 0; i < 18; i++) {
+      const a = hash2(i, 21) * TAU, rr = 2.2 + hash2(i, 31) * 4.4;
+      const cx = HX + Math.cos(a) * rr, cz = HZ + Math.sin(a) * rr;
+      if (pathDist(cx, cz) < 1.2) continue;
+      const gy = groundY(cx, cz);
+      const h = rand(.14, .5), wr = rand(.035, .06);
+      const g = cylGeo(wr, wr * .82, h, 0xffffff, 6);
+      stoneVC(g, 0xd8d2c2, .0, i * 1.7);
+      g.rotateZ(rand(-.18, .18));
+      g.translate(cx, gy + h / 2, cz);
+      wax.push(g);
+      /* charred wick + soot ring — some burned recently, snuffed by nothing */
+      if (Math.random() < .4) {
+        const wick = cylGeo(.008, .011, .1, 0x141210, 4);
+        wick.translate(cx + rand(-.03, .03), gy + h + .05, cz + rand(-.03, .03));
+        wax.push(wick);
+        const soot = new THREE.Mesh(new THREE.CircleGeometry(rand(.06, .1), 8),
+          new THREE.MeshBasicMaterial({ color: 0x0e0c0a, transparent: true, opacity: .45, depthWrite: false }));
+        soot.rotation.x = -Math.PI / 2;
+        soot.position.set(cx, gy + .015, cz);
+        scene.add(soot);
+      }
+    }
+    if (wax.length) scene.add(new THREE.Mesh(mergeGeos(wax), templeMat("sand")));
+    /* snapped banner posts — the court's boundary markers */
+    for (const [px, pz, tilt] of [[36.2, 27.4, .16], [41.8, 28.6, -.22], [37.4, 33.8, .1], [42.4, 33.2, -.12], [39.8, 25.6, .2]]) {
+      const gy = groundY(px, pz);
+      const post = new THREE.Mesh(hewnGeo(rand(1.2, 1.7), .06, .09, tint(0x3c2f22, .8, 1), px + pz), vtoonMat());
+      post.position.set(px, gy + .6, pz);
+      post.rotation.z = tilt;
+      scene.add(post);
+      charmStrip(scene, px + Math.sin(tilt) * .45, gy + 1.15, pz, .5 + hash2(px, pz) * .5, px * 1.3,
+        hash2(px, pz) < .5 ? tint(0x8e1622, .75, 1.05) : tint(0x8a8272, .7, 1));
+    }
+    bonePile(scene, 37.6, 31.6, 6, 141);
+    bonePile(scene, 40.6, 28.8, 4, 88);
+  }
+
+  /* ---------- THE PROCESSIONAL ROAD'S BONES — milestones and fallen
+     column drums along the temple approach, so the walk south reads
+     as a pilgrimage through ruins, not an empty trail ---------- */
+  {
+    const mileAt = (mx, mz, seed) => {
+      const gy = groundY(mx, mz);
+      const st = new THREE.Mesh(stoneVC(hewnGeo(rand(.7, .95), .13, .16, 0xffffff, seed), 0x9a8c6e, .45, seed * 3), templeMat("sand"));
+      st.position.set(mx, gy - .02, mz);
+      st.rotation.set(rand(-.05, .05), rand(0, TAU), rand(-.06, .06));
+      st.castShadow = true;
+      scene.add(st);
+      pushCollider(mx, mz, .4);
+    };
+    /* milestones stand beside the approach line — never on the walk band */
+    mileAt(13.2, 57.0, 3); mileAt(12.4, 60.4, 7); mileAt(11.0, 63.2, 11);
+    const drumAt = (dx, dz, seed) => {
+      const gy = groundY(dx, dz);
+      const d = new THREE.Mesh(stoneVC(cylGeo(rand(.26, .34), rand(.3, .36), rand(.7, 1), 0xffffff, 9), 0xa89a78, .5, seed), templeMat("sand"));
+      d.rotateZ(Math.PI / 2);
+      d.rotateY(rand(0, TAU));
+      d.position.set(dx, gy + .3, dz);
+      d.castShadow = true;
+      scene.add(d);
+      const moss = new THREE.Mesh(sphGeo(.22, 0x2c4a2c, 6), vtoonMat());
+      moss.scale.set(1, .35, .8);
+      moss.position.set(dx + rand(-.1, .1), gy + .52, dz + rand(-.1, .1));
+      scene.add(moss);
+      pushCollider(dx, dz, .5);
+    };
+    drumAt(13.4, 55.8, 5); drumAt(13.0, 59.8, 9); drumAt(11.6, 62.6, 13); drumAt(7.8, 64.8, 17);
   }
 }
 
