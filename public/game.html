@@ -53,7 +53,7 @@
 <script>
 /* ======== engine.js ======== */
 /* ============================================================
-   WHISPERS OF ANGOR'S SHADOWS — core engine
+   WHISPERS OF ANGKOR'S SHADOWS — core engine
    canvas, input, seeded RNG, math, audio, particles, save
    ============================================================ */
 "use strict";
@@ -12839,7 +12839,7 @@ const MENU_TABS = ["Inventory", "Forge Guide", "Battalion", "Journal", "Lore", "
 function renderMenu(time) {
   ctx.fillStyle = "rgba(3,4,8,.88)"; ctx.fillRect(0, 0, W, H);
   panel(40, 30, W - 80, H - 60, "rgba(214,169,74,.5)");
-  textShadowed("— WHISPERS OF ANGOR'S SHADOWS —", W / 2, 62, "#d6a94a", "bold 18px Georgia", "center");
+  textShadowed("— WHISPERS OF ANGKOR'S SHADOWS —", W / 2, 62, "#d6a94a", "bold 18px Georgia", "center");
   // tabs
   MENU_TABS.forEach((t, i) => {
     const x = 70 + i * 150;
@@ -14003,7 +14003,7 @@ function renderAdvisory() {
   textShadowed("RATED", 0, -12, "rgba(242,234,215,.85)", "bold 15px Arial", "center");
   textShadowed("R", 0, 20, "#b51f35", "bold 44px Georgia", "center");
   ctx.restore();
-  textShadowed("WHISPERS OF ANGOR'S SHADOWS", W / 2, 258, "#d6a94a", "bold 20px Georgia", "center");
+  textShadowed("WHISPERS OF ANGKOR'S SHADOWS", W / 2, 258, "#d6a94a", "bold 20px Georgia", "center");
   khmerDivider(W / 2, 276, 320, 0.7);
   const lines = [
     "This is a work of interactive horror for ADULTS (18+). It contains:",

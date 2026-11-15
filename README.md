@@ -16,7 +16,17 @@ ghost soldier who still marches his post — and the Whisperer that wears a
 drowned nāga's stolen face. The ward-song itself turns out to be the oldest
 wedding song of the Khmer: Preah Thong's procession to **Neang Neak**.
 
-## Play
+## Play online — no install
+
+The game is hosted on GitHub Pages:
+
+- **[3D Remake](https://cmckhmer.github.io/WHISPERS-OF-ANGKOR-S-SHADOWS/public/game3d.html)** — the full six-chapter story.
+- **[2D Classic](https://cmckhmer.github.io/WHISPERS-OF-ANGKOR-S-SHADOWS/public/game.html)** — the original pixel-art action RPG.
+
+A landing page for both versions lives at the
+[root of this site](https://cmckhmer.github.io/WHISPERS-OF-ANGKOR-S-SHADOWS/).
+
+## Play locally
 
 ```bash
 npm install
