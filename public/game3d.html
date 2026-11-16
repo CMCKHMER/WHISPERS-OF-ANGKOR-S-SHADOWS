@@ -195,6 +195,44 @@
   #shopCloseBtn { display:block; margin:14px auto 0; font:11px Georgia,serif; letter-spacing:2px;
     color:rgba(243,234,210,.7); background:none; border:1px solid rgba(243,234,210,.3); padding:7px 22px; cursor:pointer; }
   #shopCloseBtn:hover { color:#fff; border-color:rgba(214,169,74,.6); }
+  /* ---- settings, age gate, cutscenes, blood vignette ---- */
+  body[data-lang="km"] #vitals, body[data-lang="km"] #pausePanel, body[data-lang="km"] #title,
+  body[data-lang="km"] #ageGate, body[data-lang="km"] #cutscene, body[data-lang="km"] #quest,
+  body[data-lang="km"] #chronicle, body[data-lang="km"] #deathPanel { font-family: 'Noto Sans Khmer', 'Khmer OS Battambang', sans-serif !important; }
+  #bloodVignette { position:absolute; inset:0; pointer-events:none; z-index:18; opacity:0;
+    background: radial-gradient(ellipse at center, transparent 42%, rgba(120,8,16,.55) 100%); }
+  #ageGate { position:absolute; inset:0; z-index:40; display:none; align-items:center; justify-content:center;
+    background:rgba(2,4,3,.96); }
+  #ageGate .box { width:min(620px,92vw); max-height:92vh; overflow:auto; border:1px solid rgba(214,169,74,.55);
+    background:linear-gradient(180deg,#0a0d12,#05070a); padding:26px 34px 24px; text-align:center;
+    box-shadow:0 0 60px rgba(0,0,0,.8); }
+  #ageGate .box img { width:100%; height:150px; object-fit:cover; opacity:.85; margin-bottom:16px;
+    border:1px solid rgba(214,169,74,.4); }
+  #ageGate .rating { display:inline-block; border:2px solid #b51f35; color:#ff9a8a; font:600 13px/1 Georgia,serif;
+    letter-spacing:2px; padding:10px 18px; margin-bottom:16px; }
+  #ageGate h1 { color:#d6a94a; font:400 24px Georgia,serif; letter-spacing:3px; margin:0 0 12px; }
+  #ageGate p { color:rgba(243,234,210,.8); font:13.5px/1.9 Georgia,serif; margin:0 0 6px; }
+  #ageGate .desc { color:rgba(243,234,210,.55); font:12.5px/2 Georgia,serif; margin:12px 0 20px; }
+  #ageGate button { cursor:pointer; background:#120d08; color:#d6a94a; border:1px solid rgba(214,169,74,.65);
+    font:14px Georgia,serif; letter-spacing:2px; padding:11px 22px; margin:0 8px; }
+  #ageGate button:hover { background:#241a0e; }
+  #cutscene { position:absolute; inset:0; z-index:30; display:none; align-items:center; justify-content:center;
+    background:#020403; }
+  #cutscene img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:.88;
+    filter:saturate(.92) contrast(1.05); }
+  #cutscene .veil { position:absolute; inset:0;
+    background:linear-gradient(180deg, rgba(2,4,3,.2) 0%, rgba(2,4,3,.45) 55%, rgba(2,4,3,.85) 92%); }
+  #cutscene .stack { position:relative; text-align:center; max-width:min(760px,88vw); margin-top:32vh; }
+  #cutTitle { color:#d6a94a; font:400 24px Georgia,serif; letter-spacing:4px; margin-bottom:12px;
+    text-shadow:0 2px 14px rgba(0,0,0,.9); }
+  #cutText { color:rgba(243,234,210,.94); font:15px/1.85 Georgia,serif; text-shadow:0 1px 8px rgba(0,0,0,.9); }
+  #cutHint { position:relative; margin-top:24px; color:rgba(214,169,74,.75); font:12px Georgia,serif; letter-spacing:2px; }
+  #settingsBox { margin-top:14px; border-top:1px solid rgba(214,169,74,.25); padding-top:10px; width:100%; }
+  .setrow { display:flex; align-items:center; justify-content:space-between; gap:18px; padding:4px 4px; }
+  .setrow span { color:rgba(243,234,210,.75); font:12.5px Georgia,serif; letter-spacing:1px; }
+  .setbtn { cursor:pointer; min-width:86px; background:#120d08; color:#d6a94a; border:1px solid rgba(214,169,74,.5);
+    font:12.5px Georgia,serif; letter-spacing:1px; padding:6px 12px; }
+  .setbtn:hover { background:#241a0e; }
 </style>
 </head>
 <body>
@@ -279,6 +317,11 @@
       <button class="menuBtn small" id="chronBtn">CHRONICLE</button>
       <button class="menuBtn small" id="muteBtn">SOUND: ON</button>
     </div>
+    <div id="settingsBox">
+      <div class="setrow"><span id="lblVoice">VOICE</span><button class="setbtn" id="voiceBtn">ON</button></div>
+      <div class="setrow"><span id="lblBlood">BLOOD &amp; GORE</span><button class="setbtn" id="bloodBtn">ON</button></div>
+      <div class="setrow"><span id="lblLang">LANGUAGE · ភាសា</span><button class="setbtn" id="langBtn">EN</button></div>
+    </div>
     <div id="chronicle"></div>
   </div>
   <div id="deathPanel">
@@ -295,6 +338,30 @@
     <div class="ctr">A girl, a dagger, and the things that whisper in the paddies.<br>
     WASD / Arrow keys move · SHIFT sprint · LMB strike · SPACE dodge · E talk<br>1–4 blessings · H heal · C incense · X rice offering · G charm · Drag / Q·R rotate camera · Wheel zoom · V curse-vision · M full map</div>
   </div>
+  <div id="cutscene">
+    <img id="cutImg" alt="">
+    <div class="veil"></div>
+    <div class="stack">
+      <div id="cutTitle"></div>
+      <div id="cutText"></div>
+      <div id="cutHint">— press any key —</div>
+    </div>
+  </div>
+  <div id="bloodVignette"></div>
+
+  <div id="ageGate">
+    <div class="box">
+      <img src="./cutscenes/gate.jpg" alt="">
+      <div class="rating">MATURE 17+</div>
+      <h1 id="ageTitle">WHISPERS OF ANGKOR'S SHADOWS</h1>
+      <p id="ageBody">A dark Khmer folk-horror action RPG. This night is not for children.</p>
+      <p class="desc" id="ageDesc">Contains: folk horror and the restless dead · blood and gore · strong language · mischief, thieving and cursed bargains · themes of grief.</p>
+      <div>
+        <button id="ageEnter">I AM 17+ — ENTER</button>
+        <button id="ageLeave">LEAVE</button>
+      </div>
+    </div>
+  </div>
   <div id="loading">SUMMONING THE NIGHT …</div>
 
   <!-- archived item card (kept for HUD init; hidden) -->
@@ -306,6 +373,10 @@
 </div>
 
 <script type="importmap">{ "imports": { "three": "./vendor/three/three.module.min.js" } }</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Khmer:wght@400;600&display=swap" rel="stylesheet">
+<script src="./voice/registry.js"></script>
 <script type="module">
 /* ======== core3d.js ======== */
 /* ============================================================
@@ -2118,7 +2189,7 @@ function faceTick(a, dt, name) {
 
 /* ---------- player controller ---------- */
 const P_player = {
-  actor: null, yaw: 0, vy: 0, grounded: true,
+  actor: null, yaw: 0, vy: 0, airVel: null, grounded: true,
   mode: "loco",              /* loco | jump | dodge | atk | hurt | dead */
   atkIdx: 0, atkT: 0, chainQueued: false, chainWindow: false,
   dodgeT: 0, dodgeDir: new THREE.Vector3(),
@@ -2248,10 +2319,18 @@ function updateBopha(dt) {
     }
   }
   else if (p.mode === "jump") {
-    p.vy -= 13.5 * dt;
+    p.vy -= 12.5 * dt;
     a.root.position.y += p.vy * dt;
+    /* directional air control — steer mid-jump and carry the launch
+       momentum, so ledges, wall tops and terraces are reachable on purpose */
+    if (moving) a.root.position.addScaledVector(_mv, dt * (wantRun ? p.speedRun : p.speedWalk) * .62);
+    if (p.airVel) {
+      a.root.position.addScaledVector(p.airVel, dt);
+      p.airVel.multiplyScalar(Math.max(0, 1 - 2.6 * dt));
+      if (p.airVel.lengthSq() < .0004) p.airVel = null;
+    }
     const gy = groundY(a.root.position.x, a.root.position.z);
-    if (a.root.position.y <= gy) { a.root.position.y = gy; p.mode = "loco"; a.player.play("idle", { fade: .12 }); }
+    if (a.root.position.y <= gy) { a.root.position.y = gy; p.mode = "loco"; p.airVel = null; a.player.play("idle", { fade: .12 }); }
   }
 
   /* -------- loco start actions -------- */
@@ -2274,8 +2353,11 @@ function updateBopha(dt) {
   }
   /* jump from loco/jumpable states */
   if ((p.mode === "loco") && W3.keysOnce.f) {
-    p.mode = "jump"; p.vy = 4.4;
+    p.mode = "jump"; p.vy = 4.7;
+    /* directional jump: leave the ground along the current move vector */
+    p.airVel = moving ? _mv.clone().multiplyScalar((wantRun ? p.speedRun : p.speedWalk) * .8) : null;
     a.player.play("jump", { restart: true, fade: .07 });
+    Particles.burst(a.root.position.x, .1, a.root.position.z, 6, { color: 0x9fb4c4, spdMin: .4, spdMax: 1.2, sMax: .05, lifeMax: .4, grav: -6 });
   }
 
   /* -------- locomotion -------- */
@@ -2375,6 +2457,7 @@ function hurtPlayer(amount, fromPos) {
   camShake(0.22);
   SFX.hurt();
   addMomentaryFlash(0.16);
+  BLOOD.hurt();
   Particles.burst(a.root.position.x, 1.1, a.root.position.z, 14, { color: [0x8e1622, 0xc8202f, 0x5f0e18], spdMin: 1, spdMax: 3, sMax: .08, lifeMax: .7, grav: -8 });
   hudDamage(worldToScreen(a.root.position.x, 1.7, a.root.position.z), "-" + amount, "hurt");
   if (p.hp <= 0) {
@@ -7418,6 +7501,90 @@ function buildWhisperer() {
   return { root: g, eyeMat, hood };
 }
 
+/* ---------- foe variation + detail pass: no two creatures alike ---------- */
+function addRimShell(root, color, rad, y) {
+  const shell = new THREE.Mesh(new THREE.SphereGeometry(rad, 14, 10),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .08, side: THREE.BackSide,
+      blending: THREE.AdditiveBlending, depthWrite: false }));
+  shell.position.y = y; root.add(shell); return shell;
+}
+function addTatters(root, n, yBase, spread, colors) {
+  for (let i = 0; i < n; i++) {
+    const w = rand(.1, .26), h = rand(.3, .66);
+    const g = new THREE.PlaneGeometry(w, h, 1, 3);
+    const pos = g.attributes.position;
+    for (let v = 0; v < pos.count; v++) {
+      const yy = pos.getY(v);
+      pos.setZ(v, Math.sin(v * 2.7 + i) * .05 * (1 - (yy + h / 2) / h));
+    }
+    const m = new THREE.Mesh(g, toonMat(colors[i % colors.length], { transparent: true, opacity: .92, side: THREE.DoubleSide }));
+    const a = (i / n) * TAU + rand(-.5, .5);
+    m.position.set(Math.cos(a) * spread * rand(.5, 1), yBase + rand(-.1, .25), Math.sin(a) * spread * rand(.5, 1));
+    m.rotation.set(rand(-.25, .1), rand(0, TAU), rand(-.2, .2));
+    root.add(m);
+  }
+}
+function addTendrils(root, n, yTop, len, color, r = .028) {
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * TAU + rand(-.4, .4), sway = rand(.12, .3);
+    const pts = [];
+    for (let k = 0; k <= 4; k++) {
+      const t = k / 4;
+      pts.push(new THREE.Vector3(
+        Math.cos(a) * .1 * t + Math.sin(t * 5 + i) * sway * t,
+        yTop - len * t,
+        Math.sin(a) * .1 * t + Math.cos(t * 4 + i * 2) * sway * t));
+    }
+    root.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 8, r * rand(.7, 1.3), 5), toonMat(color)));
+  }
+}
+const FOE_DETAIL = {
+  wraith(f) { addTatters(f.root, 3, .55, .3, [0x1e2028, 0x274048, 0x1c3038]); },
+  drowned(f) { addTatters(f.root, 3, .6, .32, [0x33251a, 0x22371f, 0x2e3a2a]); },
+  monk(f) { addTatters(f.root, 2, .7, .3, [0x503a2a, 0x372a1e]); },
+  priestess(f) { addTatters(f.root, 3, .8, .34, [0x6e5a2a, 0x3a2a52, 0x241a2e]); addRimShell(f.root, 0xd6a94a, .55, .9); },
+  krasue(f) { addTendrils(f.root, 3, 0, .5, 0x7a2430, .024); },
+  queen(f) {
+    addRimShell(f.root, 0xd6a94a, .8, 1.2);
+    addTatters(f.root, 4, .9, .45, [0x4a1a22, 0x6e5a2a, 0x241a2e]);
+    for (let i = 0; i < 5; i++) {
+      const sp = new THREE.Mesh(new THREE.ConeGeometry(.03, .22, 5), toonMat(0xd6a94a));
+      const a = (i / 5) * TAU;
+      sp.position.set(Math.cos(a) * .16, 1.62, Math.sin(a) * .16);
+      sp.rotation.z = Math.cos(a) * .5; sp.rotation.x = -Math.sin(a) * .5;
+      f.root.add(sp);
+    }
+  },
+  krongpali(f) {
+    addRimShell(f.root, 0xbfd4ff, 1.5, 2.0);
+    for (let i = 0; i < 3; i++) {
+      const sl = new THREE.Mesh(jitterGeo(new THREE.BoxGeometry(rand(.4, .6), .14, rand(.3, .5), 2, 2, 2), .06, i * 9 + 3), toonMat(0x5a5f66));
+      sl.position.set(rand(-.35, .35), 1.55 + i * .18, rand(-.2, .2));
+      sl.rotation.y = rand(0, TAU);
+      f.root.add(sl);
+    }
+  },
+  vossandei(f) { addTatters(f.root, 3, .75, .3, [0x4a1a22, 0x241a2e, 0x33251a]); addRimShell(f.root, 0x70e8ff, .5, .95); },
+  whisperer(f) { addRimShell(f.root, 0xa855f7, 1.1, 1.4); addTendrils(f.root, 4, .5, 1.1, 0x6a3a8a, .05); },
+  naga(f) {
+    const frill = new THREE.Mesh(new THREE.ConeGeometry(.3, .5, 7), toonMat(0x2e6d5a));
+    frill.scale.z = .25; frill.position.set(0, 1.2, -.18); frill.rotation.x = -.6;
+    f.root.add(frill);
+  },
+  warden(f) { addRimShell(f.root, 0x70e8ff, .8, 1.2); }
+};
+function variateFoe(f, kind) {
+  const j = (s) => 1 - s + Math.random() * s * 2;
+  f.root.scale.set(j(.07), j(.10), j(.07));
+  f.root.rotation.x += rand(-.035, .035); f.root.rotation.z += rand(-.035, .035);
+  const mats = new Set();
+  f.root.traverse(o => { if (o.isMesh && o.material && o.material.isMeshToonMaterial && o.material.color) mats.add(o.material); });
+  for (const m of mats) {
+    const hsl = { h: 0, s: 0, l: 0 }; m.color.getHSL(hsl);
+    m.color.setHSL((hsl.h + rand(-.012, .012) + 1) % 1, clamp(hsl.s * rand(.92, 1.14), 0, 1), clamp(hsl.l * rand(.94, 1.08), 0, 1));
+  }
+  try { (FOE_DETAIL[kind] || FOE_DETAIL.wraith)(f); } catch (e) { /* detail is best-effort */ }
+}
 function spawnFoe(kind, x, z, hpScale = 1) {
   const K = FOE_KINDS[kind];
   let m, actor = null;
@@ -7445,6 +7612,7 @@ function spawnFoe(kind, x, z, hpScale = 1) {
     dead: false, dissolve: 0, struck: false
   };
   f.root.position.set(x, K.fly ? f.hover + groundY(x, z) : groundY(x, z) - 1.1, z);
+  variateFoe(f, kind);
   W3.scene.add(f.root);
   Foes.list.push(f);
   /* first-sighting lore beat */
@@ -7457,9 +7625,9 @@ function spawnFoe(kind, x, z, hpScale = 1) {
       warden: ["The Neak Ta itself leans on the gate. Stand, little blade.", "THE WARDEN"],
       priestess: ["A priestess of the court — gold crown, candle eyes. She spits in volleys; watch the spread.", "COURT PRIESTESS"],
       queen: ["THE KRASUE QUEEN — she wore a woman's face when the fields were green. End her audience.", "THE KRASUE QUEEN"],
-      krongpali: ["KRONG PALI — the giant of the causeway. His war forgot him; he never forgot his post. Mind the slam.", "KRONG PALI"],
-      vossandei: ["KRU VOSSANDEI — he served this village, then served something older. The ward-song dies with his silence.", "THE KRU"],
-      whisperer: ["THE WHISPERER — older than the temple, older than the song. It wears a drowned nāga's face. It wants the dagger.", "THE WHISPERER"]
+      krongpali: ["KRONG PALI — the giant of the causeway. His war forgot him; he never forgot his post. Mind the slam — it is a hell of a slam.", "KRONG PALI"],
+      vossandei: ["KRU VOSSANDEI — he served this village, then served something older. The ward-song dies with his silence. The stubborn bastard still won't sing it.", "THE KRU"],
+      whisperer: ["THE WHISPERER — older than the temple, older than the song. It wears a drowned nāga's face. It wants the dagger — and it wants you begging for hell's mercy.", "THE WHISPERER"]
     }[kind];
     if (lore) hudQuote(lore[0], lore[1]);
   }
@@ -7835,6 +8003,47 @@ const FOE_FX = {
   vossandei: { hit: [0xd8cdb4, 0x9a6fff, 0xd6a94a], die: [0xd8cdb4, 0x9a6fff, 0xe8e0cc], spectral: true },
   whisperer: { hit: [0x9a6fff, 0x2c3550, 0x70e8ff], die: [0x9a6fff, 0xffd76b, 0x1a1f2e], spectral: true }
 };
+/* ---------- BLOOD & GORE — the grounded cost of the blade ---------- */
+const BLOOD = {
+  on: localStorage.getItem("woas_blood") !== "off",
+  pools: [], vigT: 0, vigEl: null,
+  fleshy(kind) { return kind !== "wraith" && kind !== "whisperer"; },
+  spurt(x, y, z, big) {
+    Particles.burst(x, y, z, big ? 24 : 11,
+      { color: [0x8e1622, 0x5c0e18, 0xb51f35], spdMin: big ? 1.1 : .7, spdMax: big ? 3.2 : 2.1,
+        sMin: .03, sMax: big ? .1 : .07, lifeMin: .3, lifeMax: .8, grav: -9, drag: 1.2 });
+    if (big) this.pool(x, z);
+  },
+  pool(x, z) {
+    if (this.pools.length > 22) {
+      const old = this.pools.shift();
+      W3.scene.remove(old.m); old.m.geometry.dispose(); old.m.material.dispose();
+    }
+    const s = rand(.65, 1.4);
+    const m = new THREE.Mesh(new THREE.CircleGeometry(s, 10),
+      new THREE.MeshBasicMaterial({ color: 0x4a0c14, transparent: true, opacity: 0, depthWrite: false }));
+    m.rotation.x = -Math.PI / 2; m.rotation.z = rand(0, TAU);
+    m.position.set(x, groundY(x, z) + .025 + Math.random() * .02, z);
+    W3.scene.add(m);
+    this.pools.push({ m, t: 0 });
+  },
+  hurt() {
+    if (!this.on) return;
+    this.vigT = 1;
+    this.vigEl ??= document.getElementById("bloodVignette");
+  },
+  update(dt) {
+    this.vigT = Math.max(0, this.vigT - dt * 1.1);
+    if (this.vigEl) this.vigEl.style.opacity = (this.vigT * .8).toFixed(3);
+    for (let i = this.pools.length - 1; i >= 0; i--) {
+      const p = this.pools[i]; p.t += dt;
+      if (p.t < .5) p.m.material.opacity = p.t / .5 * .74;
+      else if (p.t > 26) p.m.material.opacity = Math.max(0, .74 * (1 - (p.t - 26) / 6));
+      if (p.t > 32) { W3.scene.remove(p.m); p.m.geometry.dispose(); p.m.material.dispose(); this.pools.splice(i, 1); }
+    }
+  }
+};
+
 function damageFoe(f, dmg, fromDir) {
   if (f.dead) return;
   const fx = FOE_FX[f.kind];
@@ -7842,6 +8051,7 @@ function damageFoe(f, dmg, fromDir) {
   const hy = f.k.fly ? 1.2 : (f.actor ? 1.1 : 1.0);
   Particles.burst(f.root.position.x, hy, f.root.position.z,
     12, { color: fx.hit, spdMin: 1, spdMax: 3.4, sMax: .09, lifeMax: .7, grav: -7 });
+  if (BLOOD.on && BLOOD.fleshy(f.kind)) BLOOD.spurt(f.root.position.x, hy, f.root.position.z, false);
   hudDamage(worldToScreen(f.root.position.x, hy + .6, f.root.position.z),
     String(dmg), dmg >= 18 ? "crit" : "");
   SFX.hit(fx.spectral);
@@ -7849,6 +8059,7 @@ function damageFoe(f, dmg, fromDir) {
   camShake(0.1);
   if (f.hp <= 0) {
     f.dead = true; f.dissolve = 0;
+    if (BLOOD.on && BLOOD.fleshy(f.kind)) BLOOD.spurt(f.root.position.x, f.root.position.y + hy, f.root.position.z, true);
     Foes.kills++;
     SFX.kill(fx.spectral);
     Particles.burst(f.root.position.x, hy - .1, f.root.position.z,
@@ -8340,7 +8551,9 @@ function questOnKill(f) {
     rewardPlayer(110, 70);
     camShake(.3);
     SFX.wail();
-    hudQuote("The kru's robes fall empty and the flooded gallery BOILS — the thing he served has come to collect its choir. Chantria's voice reaches you even here: she will teach you the oldest step. Press 4.", "THE WHISPERER RISES");
+    storyMoment("ch5", "CHAPTER 5 · THE WHISPERER",
+    "Vossandei's robes fall empty. The thing he called up wears the drowned nāga's stolen face — and it hums the song wrong on purpose. The bastard ends tonight.",
+    () => hudQuote("The kru's robes fall empty and the flooded gallery BOILS — the thing he served has come to collect its choir. Chantria's voice reaches you even here: she will teach you the oldest step. Press 4.", "THE WHISPERER RISES"));
     setTimeout(() => { if (QUEST.phase === 16 && W3.state === "play") spawnFoe("whisperer", 10, 70); }, 4500);
   } else if (QUEST.phase === 16 && f.kind === "whisperer") {
     /* the mask breaks; every stolen verse comes loose at once */
@@ -8462,7 +8675,9 @@ function questForgeComplete() {
   QUEST.phase = 6;
   P_player.emberBlade = true;
   hudQuest();
-  hudQuote("“The ember drinks into the steel. Strike true, little blade — the drowned temple whispers your name now.”", "CHAPTER 2 CLEARED — THE EMBER BLADE");
+  storyMoment("ch3", "CHAPTER 3 · THE KRASUE'S COURT",
+    "The ember blade drinks its first hungers. Out past the deep mist the hanging witches have gathered a court — and their queen keeps a list of names.",
+    () => hudQuote("“The ember drinks into the steel. Strike true, little blade — the drowned temple whispers your name now.”", "CHAPTER 2 CLEARED — THE EMBER BLADE"));
   SFX.levelup();
   rewardPlayer(40, 30);
   setTimeout(() => {
@@ -8504,7 +8719,9 @@ function questQueenAudience() {
 function questCourtComplete() {
   QUEST.phase = 11;
   hudQuest();
-  hudQuote("“The verse fits the dance like a foot in an old slipper. The wall stands double-thick — and something under paddy five has noticed YOU.”", "CHAPTER 3 CLEARED — THE KRASUE'S COURT");
+  storyMoment("ch4", "CHAPTER 4 · THE SUNKEN TEMPLE",
+    "Under paddy five, the nāga's bones keep the beat of a stolen song. Light the braziers, wake the gallery — and watch the man who held its door.",
+    () => hudQuote("“The verse fits the dance like a foot in an old slipper. The wall stands double-thick — and something under paddy five has noticed YOU.”", "CHAPTER 3 CLEARED — THE KRASUE'S COURT"));
   SFX.levelup();
   rewardPlayer(80, 60);
   setTimeout(() => {
@@ -8558,7 +8775,9 @@ function questFinale() {
   hudUpdateVitals();
   setTimeout(() => {
     if (QUEST.phase === 18 && W3.state === "play")
-      hudQuote("The ward-song is sung whole. The wall no longer holds the dead OUT — it holds the village IN, the way a wedding holds two families. Sambok Chas rests.", "CHAPTER 6 — THE WEDDING SONG");
+      storyMoment("ch6", "CHAPTER 6 · THE WEDDING SONG",
+    "Dawn comes to Sambok Chas. The wall hums an old wedding song, the dead bow out, and the village remembers its name — Preah Thong and Neang Neak, danced whole again.",
+    () => hudQuote("The ward-song is sung whole. The wall no longer holds the dead OUT — it holds the village IN, the way a wedding holds two families. Sambok Chas rests.", "CHAPTER 6 — THE WEDDING SONG"));
   }, 9000);
 }
 
@@ -8610,7 +8829,9 @@ function questStartHunt() {
 function questComplete() {
   QUEST.phase = 3;
   hudQuest();
-  hudQuote("“Little blade. The drowned remember their names when you strike.”", "NEAK TA — CHAPTER 1 CLEARED");
+  storyMoment("ch2", "CHAPTER 2 · THE SILENT FORGE",
+    "The Neak Ta whispers a name through the reeds: the herb-witch knows whose hands took the song. The forge is cold, and only angry fire can wake it.",
+    () => hudQuote("“Little blade. The drowned remember their names when you strike.”", "NEAK TA — CHAPTER 1 CLEARED"));
   SFX.levelup();
   rewardPlayer(30, 25);
   /* the plot leans forward — Sokha names the thief, the forge awaits */
@@ -8835,7 +9056,7 @@ Object.assign(STORY.lines["Tevy"], {
 function storyLines(name) {
   const set = STORY.lines[name];
   if (!set) return null;
-  const ph = clamp(typeof QUEST !== "undefined" ? QUEST.phase : 0, 0, 11);
+  const ph = clamp(typeof QUEST !== "undefined" ? QUEST.phase : 0, 0, 18);
   return set[ph] || set[0] || null;
 }
 
@@ -8865,9 +9086,9 @@ function chronicleHTML() {
       || (c.n === 3 && ph >= 6 && ph < 11) || (c.n === 4 && ph >= 11 && ph < 16)
       || (c.n === 5 && ph >= 16 && ph < 17) || (c.n === 6 && ph >= 17 && ph < 18);
     return `<div class="ch ${done ? "done" : ""} ${now ? "now" : ""}">
-      <div class="chn">CHAPTER ${c.n}${done ? " — CLEARED" : now ? " — NOW" : ""}</div>
-      <div class="cht">${c.title}</div>
-      <div class="chb">${c.brief}</div></div>`;
+      <div class="chn">${T("chapter")} ${c.n}${done ? " — " + T("cleared") : now ? " — " + T("nowTag") : ""}</div>
+      <div class="cht">${TQ(c.title)}</div>
+      <div class="chb">${TQ(c.brief)}</div></div>`;
   }).join("");
   const cast = STORY.cast.map(c =>
     `<div class="castRow"><b>${c.name}</b><span>${c.role}</span></div>`).join("");
@@ -9084,6 +9305,7 @@ const VOICE_PROFILES = {
 
 const VOICE = (() => {
   let ctx = null, master = null;
+  let enabled = localStorage.getItem("woas_voice") !== "off";
   const clips = {};                       /* [name][idx] -> Audio(url) */
 
   function ensure() {
@@ -9126,10 +9348,20 @@ const VOICE = (() => {
     g.connect(master);
   }
 
-  function speak(name, idx = 0, syll = 6) {
-    if (!ensure()) return;
-    const c = clips[name] && clips[name][idx % Math.max(1, (clips[name].n || 1))];
-    if (c) { const a = c.cloneNode(); a.volume = .8; a.play().catch(() => {}); return; }
+  /* conversation key — the same (speaker, lines) always maps to the same
+     pre-generated human-recording set (public/voice/registry.js) */
+  function key(name, lines) {
+    let h = 5381;
+    const s = name + "\u0000" + (lines || []).join("\u0001");
+    for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
+    return name + ":" + h.toString(16).padStart(8, "0");
+  }
+
+  function speak(name, ckey, idx = 0, syll = 6) {
+    if (!ensure() || !enabled) return;
+    const set = clips[ckey];
+    const c = set && set[idx % Math.max(1, set.n || 1)];
+    if (c) { const a = c.cloneNode(); a.volume = .85; a.play().catch(() => {}); return; }
     const pr = VOICE_PROFILES[name];
     if (!pr) return;
     const n = clamp(Math.round(syll), 3, 14);
@@ -9141,12 +9373,22 @@ const VOICE = (() => {
     }
   }
 
-  function register(name, idx, url) {
-    (clips[name] ??= { n: 0 })[idx] = new Audio(url);
-    clips[name].n = Math.max(clips[name].n || 0, idx + 1);
+  function register(ckey, idx, url) {
+    (clips[ckey] ??= { n: 0 })[idx] = new Audio(url);
+    clips[ckey].n = Math.max(clips[ckey].n || 0, idx + 1);
   }
 
-  return { speak, register };
+  /* offline-generated voice manifest: { convKey: [url0, url1, ...] } */
+  try {
+    const M = window.__VOICE_MANIFEST || {};
+    for (const k of Object.keys(M)) (M[k] || []).forEach((u, i) => { if (u) register(k, i, u); });
+  } catch (e) { console.warn("voice manifest:", e); }
+
+  return {
+    speak, register, key,
+    get enabled() { return enabled; },
+    set enabled(v) { enabled = !!v; localStorage.setItem("woas_voice", enabled ? "on" : "off"); }
+  };
 })();
 
 
@@ -12076,7 +12318,7 @@ function hudQuest() {
     meta = "DAWN · SAMBOK CHAS RESTS";
   }
   HUD.questNow.textContent = now;
-  HUD.questMeta.textContent = meta;
+  HUD.questMeta.textContent = TQ(meta);
   HUD.questList.innerHTML = items.map(([t, done]) => `<li class="${done ? "done" : ""}">${t}</li>`).join("");
 }
 
@@ -12112,8 +12354,9 @@ const DIALOG = { active: false, lines: [], idx: 0, cb: null, speaker: null };
 function hudDialogue(lines, cb, speaker) {
   DIALOG.active = true; DIALOG.lines = lines; DIALOG.idx = 0;
   DIALOG.cb = cb || null; DIALOG.speaker = speaker || null;
+  DIALOG.vkey = (speaker && typeof VOICE !== "undefined") ? VOICE.key(speaker, lines) : null;
   hudQuote(lines[0], "E — continue", DIALOG.speaker);
-  if (DIALOG.speaker && typeof VOICE !== "undefined") VOICE.speak(DIALOG.speaker, 0, lines[0].length / 3.2);
+  if (DIALOG.speaker && typeof VOICE !== "undefined") VOICE.speak(DIALOG.speaker, DIALOG.vkey, 0, lines[0].length / 3.2);
 }
 function dialogAdvance() {
   DIALOG.idx++;
@@ -12126,7 +12369,7 @@ function dialogAdvance() {
     if (cb) cb();
   } else {
     hudQuote(DIALOG.lines[DIALOG.idx], "E — continue", DIALOG.speaker);
-    if (DIALOG.speaker && typeof VOICE !== "undefined") VOICE.speak(DIALOG.speaker, DIALOG.idx, DIALOG.lines[DIALOG.idx].length / 3.2);
+    if (DIALOG.speaker && typeof VOICE !== "undefined") VOICE.speak(DIALOG.speaker, DIALOG.vkey, DIALOG.idx, DIALOG.lines[DIALOG.idx].length / 3.2);
   }
 }
 
@@ -12451,6 +12694,101 @@ let bopha = null;
 let wailTimer = 6;
 let interactLock = 0;
 
+/* ---------- AI-painted chapter cutscenes ---------- */
+const CUT_ART = { intro: "./cutscenes/ch1.jpg", ch2: "./cutscenes/ch2.jpg", ch3: "./cutscenes/ch3.jpg",
+  ch4: "./cutscenes/ch4.jpg", ch5: "./cutscenes/ch5.jpg", ch6: "./cutscenes/ch6.jpg" };
+const cutQueue = []; let cutThen = null;
+function storyMoment(art, title, text, then) { cutQueue.push({ art, title, text, then }); pumpCut(); }
+function pumpCut() {
+  if (W3.state !== "play" || !cutQueue.length) return;
+  const c = cutQueue.shift(); cutThen = c.then || null;
+  document.getElementById("cutImg").src = CUT_ART[c.art] || CUT_ART.intro;
+  document.getElementById("cutTitle").textContent = TQ(c.title);
+  document.getElementById("cutText").textContent = TQ(c.text);
+  document.getElementById("cutHint").textContent = T("pressAny");
+  document.getElementById("cutscene").style.display = "flex";
+  W3.state = "cut";
+}
+function dismissCut() {
+  document.getElementById("cutscene").style.display = "none";
+  W3.state = "play";
+  const f = cutThen; cutThen = null;
+  if (f) f();
+  pumpCut();
+}
+
+/* ---------- language — English / ភាសាខ្មែរ (dialogue lines stay English) ---------- */
+const L10N = {
+  newGame: "លេងថ្មី", resume: "បន្ត", retry: "ឡើងវិញម្ដងទៀត", map: "ផែនទី", chronicle: "កម្រងរឿង",
+  chapter: "ជំពូក", cleared: "រួចរាល់", nowTag: "ឥឡូវនេះ",
+  settings: "ការកំណត់", voice: "សំឡេងនិយាយ", blood: "ឈាម និងការរងរបួស", language: "ភាសា",
+  on: "បើក", off: "បិទ", pressAny: "— ចុចគ្រាប់ចុចណាមួយ —",
+  hp: "ជីវិត", spirit: "វិញ្ញាណ", sanity: "ស្មារតី",
+  "pre:CLEAR NIGHT": "យប់ភ្លឺ", "pre:THE FLOODED DARK": "ភាពងងឹតលង់ទឹក", "pre:DAWN": "ព្រលឹម",
+  "q:DAWN · SAMBOK CHAS RESTS": "ព្រលឹម · សំបុកចាស់សម្រាក",
+  ageBody: "ល្បែងរន្ធត់បែបរឿងព្រេងខ្មែរ។ យប់នេះមិនមែនសម្រាប់កុមារទេ។",
+  ageDesc: "មាន៖ រន្ធត់ខ្មោច និងខ្មោចមិនសែង · ឈាម និងការរងរបួសខ្លាំង · ភាសាក្រៅមុខ · ការបញ៉ាំ ការលួច និងកិច្ចសន្យាព្រាល់ក្រោម · ប្រធានបទសោកសុក។",
+  ageEnter: "អាយុ ១៧ ឡើង — ចូល", ageLeave: "ចេញ",
+  "q:The Drowned Rice Fields": "ស្រែចម្រោកលង់ទឹក",
+  "q:b:Prove the dagger. Earn the Neak Ta's whisper.": "សម្រាលថាដាវនេះស្គាល់អ្នក។ ទទួលសំឡេងរបស់អ្នកតា។",
+  "q:The Silent Forge": "ចង្ក្រានស្ងាត់",
+  "q:b:Veasna reforges the blade with krasue-ember. The ward-stones are failing, one hum at a time.": "វ៉ាសនាដាវឡើងក្ដៅដោយភ្លើងក្រសុ។ ថាស្មឹងស្មាញកំពុងបរាជ័យម្ដងមួយៗ។",
+  "q:The Krasue's Court": "ក្រុមក្រសុ",
+  "q:b:The hanging witches trade a name for rice-blood: Vossandei was a man once.": "ពួកខ្មោចព្យួរលក់ឈ្មោះដើម្បីឈាមស្រូវ៖ វ៉ូសាន់ដេយធ្លាប់ជាមនុស្ស។",
+  "q:The Sunken Temple": "ប្រាសាទលង់ទឹក",
+  "q:b:Beneath paddy five lie the nāga's bones. Light the braziers, hear the mermaid, and unmask the kru who held the door.": "ក្រោមស្រែលើកទី៥ គឺខ្នងនាគ។ អុំភ្លើងធូប ស្ដាប់ស្រីទឹក និងបង្ហាញមុខគ្រូដែលចាំទ្វារ។",
+  "q:The Whisperer": "សំឡេងក្រាប",
+  "q:b:Krong Pali falls, Vossandei is unmasked — and the thing he called up wears the drowned nāga's stolen face.": "ក្រុងបាលីដួល។ វ៉ូសាន់ដេយគ្មានក្លោក។ អ្វីដែលគាត់ហៅឡើង ពាក់មុខនាគលង់ទឹក។",
+  "q:The Wedding Song": "ចម្រៀងមង្គលការ",
+  "q:b:The ward-song restored at last: the oldest wedding dance, sung for Preah Thong and Neang Neak. Dawn comes to Sambok Chas.": "បទចម្រៀងថែទាំបានជួសជុលឡើងវិញ៖ របាំមង្គលការចំណាស់ សម្រាប់ព្រះធុង និងនាងនាក។ ព្រលឹមមកដល់សំបុកចាស់។"
+};
+let LANG = localStorage.getItem("woas_lang") === "km" ? "km" : "en";
+const EN = {
+  newGame: "NEW GAME", resume: "RESUME", retry: "RISE AGAIN", map: "MAP", chronicle: "CHRONICLE",
+  chapter: "CHAPTER", cleared: "CLEARED", nowTag: "NOW",
+  voice: "VOICE", blood: "BLOOD & GORE", language: "LANGUAGE",
+  on: "ON", off: "OFF", pressAny: "— press any key —",
+  hp: "HP", spirit: "SPIRIT", sanity: "SANITY",
+  ageBody: "A dark Khmer folk-horror action RPG. This night is not for children.",
+  ageDesc: "Contains: folk horror and the restless dead · blood and gore · strong language · mischief, thieving and cursed bargains · themes of grief.",
+  ageEnter: "I AM 17+ — ENTER", ageLeave: "LEAVE"
+};
+function T(k) { return LANG === "km" ? (L10N[k] || k) : (EN[k] || k); }
+function TQ(s) {
+  if (LANG !== "km") return s;
+  const direct = L10N["q:" + s]; if (direct) return direct;
+  const brief = L10N["q:b:" + s]; if (brief) return brief;
+  const m = String(s).match(/^(.+?) · CHAPTER (\d+)( CLEARED)?$/);
+  if (m) return (L10N["pre:" + m[1]] || m[1]) + " · " + L10N.chapter + " " + m[2] + (m[3] ? " " + L10N.cleared : "");
+  return s;
+}
+function applyLang() {
+  document.body.dataset.lang = LANG;
+  try { localStorage.setItem("woas_lang", LANG); } catch (e) {}
+  for (const [sel, k] of [["#newGameBtn", "newGame"], ["#resumeBtn", "resume"], ["#retryBtn", "retry"], ["#mapBtn", "map"], ["#chronBtn", "chronicle"]]) {
+    const el = document.querySelector(sel); if (el) el.textContent = T(k);
+  }
+  const lbl = { HP: "hp", SPIRIT: "spirit", SANITY: "sanity" };
+  document.querySelectorAll("#vitals .barlabel").forEach(el => { const k = lbl[el.textContent.trim()]; if (k) el.textContent = T(k); });
+  for (const [id, k] of [["lblVoice", "voice"], ["lblBlood", "blood"], ["lblLang", "language"]]) {
+    const el = document.getElementById(id); if (el) el.textContent = T(k);
+  }
+  const vb = document.getElementById("voiceBtn");
+  if (vb) vb.textContent = T((typeof VOICE !== "undefined" && VOICE.enabled) ? "on" : "off");
+  const bb = document.getElementById("bloodBtn");
+  if (bb) bb.textContent = T(BLOOD.on ? "on" : "off");
+  const lb = document.getElementById("langBtn");
+  if (lb) lb.textContent = LANG === "km" ? "ខ្មែរ" : "EN";
+  const ab = document.getElementById("ageBody"); if (ab) ab.textContent = T("ageBody");
+  const ad = document.getElementById("ageDesc"); if (ad) ad.textContent = T("ageDesc");
+  const ae = document.getElementById("ageEnter"); if (ae) ae.textContent = T("ageEnter");
+  const al = document.getElementById("ageLeave"); if (al) al.textContent = T("ageLeave");
+  if (typeof HUD !== "undefined" && HUD.questMeta) hudQuest();
+  const chron = document.getElementById("chronicle");
+  if (chron && chron.style.display === "block" && typeof hudChronicle === "function") hudChronicle(true);
+}
+function setLang(l) { LANG = l === "km" ? "km" : "en"; applyLang(); }
+
 function boot() {
   console.log("BOOT: core");
   initCore();
@@ -12511,10 +12849,42 @@ function boot() {
     const m = SFX.toggleMute();
     e.target.textContent = m ? "SOUND: OFF" : "SOUND: ON";
   });
+  document.getElementById("voiceBtn").addEventListener("click", () => {
+    VOICE.enabled = !VOICE.enabled;
+    document.getElementById("voiceBtn").textContent = T(VOICE.enabled ? "on" : "off");
+    if (VOICE.enabled) SFX.resume();
+  });
+  document.getElementById("bloodBtn").addEventListener("click", () => {
+    BLOOD.on = !BLOOD.on;
+    try { localStorage.setItem("woas_blood", BLOOD.on ? "on" : "off"); } catch (e) {}
+    document.getElementById("bloodBtn").textContent = T(BLOOD.on ? "on" : "off");
+  });
+  document.getElementById("langBtn").addEventListener("click", () => {
+    setLang(LANG === "en" ? "km" : "en");
+  });
   addEventListener("pointerdown", () => SFX.resume(), { once: true });
   addEventListener("keydown", () => SFX.resume(), { once: true });
 
+  applyLang();
+
   W3.state = "title";
+  /* MATURE 17+ gate — folk horror, blood, strong language, mischief */
+  {
+    const gate = document.getElementById("ageGate");
+    if (localStorage.getItem("woas3d_ageok") === "1") gate.style.display = "none";
+    else {
+      W3.state = "age";
+      gate.style.display = "flex";
+      document.getElementById("ageEnter").addEventListener("click", () => {
+        localStorage.setItem("woas3d_ageok", "1");
+        gate.style.display = "none"; W3.state = "title";
+      });
+      document.getElementById("ageLeave").addEventListener("click", () => { location.href = "../index.html"; });
+    }
+  }
+  window.__DEBUG3D = { W3, QUEST, spawnFoe, storyMoment, setLang, BLOOD, VOICE,
+  playerPos: () => bopha.root.position.clone(), playerYaw: () => P_player.yaw,
+  playerMode: () => P_player.mode, playerDead: () => P_player.dead };
   loop();
 }
 
@@ -12528,7 +12898,9 @@ function startGame() {
   MUSIC.start();
   WEATHER.start(W3.scene);
   SFX.bell();
-  hudQuote("The ward-stones hum. Nothing dead can cross these walls.", "THE DROWNED RICE FIELDS");
+  storyMoment("intro", "CHAPTER 1 · THE DROWNED RICE FIELDS",
+    "Sambok Chas drowned in a single night, three seasons ago. Tonight the dead lean on the ward wall again — and her mother's dagger has chosen its keeper.",
+    () => hudQuote("The ward-stones hum. Nothing dead can cross these walls.", "THE DROWNED RICE FIELDS"));
   setTimeout(() => { if (QUEST.phase === 0) hudQuote("Chantria waits by the shrine, east of the plaza.", "FIND THE MOON-WARD DANCER"); }, 5200);
 }
 
@@ -12587,6 +12959,12 @@ function loop() {
     }
   }
 
+  /* AI-painted chapter cutscenes pause the night until dismissed */
+  if (W3.state === "cut") {
+    const anyKey = Object.keys(W3.keysOnce).some(k => W3.keysOnce[k]) || W3.mouse.once;
+    if (anyKey) { for (const k in W3.keysOnce) W3.keysOnce[k] = false; dismissCut(); }
+  }
+
   if (W3.state === "play" && !MAPSYS.open && !FORGE.open && !SHOP.open) {
     updateBopha(dt);
     updateFoes(dt);
@@ -12596,6 +12974,7 @@ function loop() {
     updateEmbers(dt);
     updateMagic(dt);
     updateBolts(dt);
+    BLOOD.update(dt);
     updateWorld(dt);
     handleInteract(dt);
     hudComboUpdate(dt);

@@ -20,11 +20,32 @@ wedding song of the Khmer: Preah Thong's procession to **Neang Neak**.
 
 The game is hosted on GitHub Pages:
 
-- **[3D Remake](https://cmckhmer.github.io/WHISPERS-OF-ANGKOR-S-SHADOWS/public/game3d.html)** — the full six-chapter story.
-- **[2D Classic](https://cmckhmer.github.io/WHISPERS-OF-ANGKOR-S-SHADOWS/public/game.html)** — the original pixel-art action RPG.
+- **[3D Remake](https://cmckhmer.github.io/WHISPERS-OF-ANGKOR-S-SHADOWS/public/game3d.html)** — the full six-chapter story. **This is the actively developed version.**
+- **[2D Classic](https://cmckhmer.github.io/WHISPERS-OF-ANGKOR-S-SHADOWS/public/game.html)** — the original pixel-art action RPG (feature-frozen).
 
 A landing page for both versions lives at the
 [root of this site](https://cmckhmer.github.io/WHISPERS-OF-ANGKOR-S-SHADOWS/).
+
+## Features
+
+- **Voiced dialogue** — every story conversation is spoken in a human TTS
+  voice, cast per character (female voices for the women of Sambok Chas,
+  male voices for the smith, the warden, the elder and the things that
+  whisper). Toggle under TAB → Settings.
+- **AI-painted chapter cutscenes** — each chapter opens on a generated,
+  painterly folk-horror illustration.
+- **Khmer language option** — TAB → Settings → Language switches the interface
+  (menus, vitals, quest headers, chronicle) to ភាសាខ្មែរ; dialogue lines stay
+  English for now.
+- **Blood & gore toggle** — arterial spurts, ground pools and a hurt vignette;
+  spirits bleed nothing. Toggle under TAB → Settings.
+- **Directional jumping** — F jumps along your movement vector with mid-air
+  steering; ledges, wall tops and terraces are reachable on purpose.
+- **MATURE 17+ gate** — folk horror, blood, strong language, mischief and
+  cursed bargains; acknowledged once, remembered in `localStorage`.
+- **Living monsters** — foes spawn with per-instance scale/tilt/hue variation,
+  tattered cloth, bone ornaments, tendril strands and rim-light halos; no two
+  look alike.
 
 ## Play locally
 
