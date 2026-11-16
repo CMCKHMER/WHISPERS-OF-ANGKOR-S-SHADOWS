@@ -20,10 +20,9 @@ wedding song of the Khmer: Preah Thong's procession to **Neang Neak**.
 
 The game is hosted on GitHub Pages:
 
-- **[3D Remake](https://cmckhmer.github.io/WHISPERS-OF-ANGKOR-S-SHADOWS/public/game3d.html)** — the full six-chapter story. **This is the actively developed version.**
-- **[2D Classic](https://cmckhmer.github.io/WHISPERS-OF-ANGKOR-S-SHADOWS/public/game.html)** — the original pixel-art action RPG (feature-frozen).
+- **[3D Remake](https://cmckhmer.github.io/WHISPERS-OF-ANGKOR-S-SHADOWS/public/game3d.html)** — the full six-chapter story. **This is the actively developed version and the only listed entry point.**
 
-A landing page for both versions lives at the
+A landing page lives at the
 [root of this site](https://cmckhmer.github.io/WHISPERS-OF-ANGKOR-S-SHADOWS/).
 
 ## Features
@@ -55,7 +54,6 @@ npm run dev        # http://localhost:3000/game3d.html
 ```
 
 Production: `npm run build`, then `npm start` (serves the standalone build).
-The classic 2D version lives at `/game.html`.
 
 ## Controls
 

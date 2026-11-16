@@ -1,7 +1,9 @@
 {
-  "name": "nextjs_tailwind_shadcn_ts",
+  "name": "whispers-of-angkors-shadows",
   "version": "0.2.1",
   "private": true,
+  "description": "A dark Khmer folklore action RPG — Bopha, ward-orphan of drowned Sambok Chas, carries the dagger that hears whispers. Plays free in the browser (three.js).",
+  "homepage": "https://cmckhmer.github.io/WHISPERS-OF-ANGKOR-S-SHADOWS/",
   "scripts": {
     "dev": "next dev -p 3000 2>&1 | tee dev.log",
     "build": "next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/",
