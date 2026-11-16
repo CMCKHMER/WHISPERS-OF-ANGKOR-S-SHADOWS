@@ -909,6 +909,7 @@ const SPIRITS = {
   },
   tree_bound: {
     id: "tree_bound", name: "Tree-Bound Spirit", title: "roots grew through its memory",
+    memory: "mem_tree",
     will: 85, aggr: 0.6, banishRes: 0.35, crave: "incense",
     style: "root", bonus: "bulwark", role: "Bulwark",
     telegraphs: ["lunge", "curse", "wail"],
@@ -916,6 +917,7 @@ const SPIRITS = {
   },
   stone_watcher: {
     id: "stone_watcher", name: "Stone Watcher", title: "it only moves when unseen",
+    memory: "mem_stone",
     will: 95, aggr: 0.75, banishRes: 0.45, crave: "gold",
     style: "stone", bonus: "bulwark", role: "Bulwark",
     telegraphs: ["lunge", "wail", "curse"],
@@ -923,6 +925,7 @@ const SPIRITS = {
   },
   hollow_monk: {
     id: "hollow_monk", name: "Hollow Monk", title: "silence where a face should be",
+    memory: "mem_monk",
     will: 90, aggr: 0.65, banishRes: 0.4, crave: "incense",
     style: "monk", bonus: "bulwark", role: "Bulwark",
     telegraphs: ["wail", "curse", "lunge"],
@@ -930,6 +933,7 @@ const SPIRITS = {
   },
   ghost_soldier: {
     id: "ghost_soldier", name: "Ghost Soldier", title: "still marching to a dead order",
+    memory: "mem_soldier",
     will: 100, aggr: 0.85, banishRes: 0.4, crave: "gold",
     style: "soldier", bonus: "revenant", role: "Revenant",
     telegraphs: ["lunge", "lunge", "curse"],
@@ -937,6 +941,7 @@ const SPIRITS = {
   },
   water_wraith: {
     id: "water_wraith", name: "Water Wraith", title: "the reservoir remembers drowning",
+    memory: "mem_wraith",
     will: 80, aggr: 0.7, banishRes: 0.3, crave: "lotus",
     style: "water", bonus: "stalker", role: "Stalker",
     telegraphs: ["lure", "lunge", "wail"],
@@ -944,6 +949,7 @@ const SPIRITS = {
   },
   cultist_echo: {
     id: "cultist_echo", name: "Cultist Echo", title: "the last prayer loops forever",
+    memory: "mem_cultist",
     will: 75, aggr: 0.6, banishRes: 0.25, crave: "blood",
     style: "cult", bonus: "chanter", role: "Chanter",
     telegraphs: ["curse", "wail", "lure"],
@@ -9664,7 +9670,7 @@ function startBattle(src) {
     srcSpirit: src.kind === "spirit" ? src.s : null,
     type: cfg.id, style: cfg.style, name: cfg.name, title: cfg.title,
     appear: cfg.appear, crave: cfg.crave, aggr: cfg.aggr, banishRes: cfg.banishRes,
-    memory: src.kind === "spirit" ? (MEMORIES["mem_" + cfg.id] ? "mem_" + cfg.id : null) : memId,
+    memory: src.kind === "spirit" ? (cfg.memory || (MEMORIES["mem_" + cfg.id] ? "mem_" + cfg.id : null)) : memId,
     will: willMax, willMax,
     resolve: player.hp, resolveMax: player.maxHp,
     round: 1, phase: "intro", phaseT: 0,
@@ -11451,6 +11457,10 @@ function updateBattle(dt) {
               const nx = player.x + Math.cos(a2) * 8, ny = player.y + Math.sin(a2) * 8;
               if (canStand(G.zoneObj, nx, ny)) { player.x = nx; player.y = ny; }
             }
+          }
+          if (b.phase === "victory" && b.memory && !G.memories.includes(b.memory)) {
+            G.memories.push(b.memory);
+            addLog("Memory fragment: " + (MEMORIES[b.memory] ? MEMORIES[b.memory].title : b.memory));
           }
           G.battle = null;
           G.state = "explore";

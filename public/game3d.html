@@ -8859,9 +8859,11 @@ const STORY_HOOKS = {
 function chronicleHTML() {
   const ph = QUEST.phase;
   const ch = STORY.chapters.map(c => {
-    const done = (c.n === 1 && ph >= 3) || (c.n === 2 && ph >= 6) || (c.n === 3 && ph >= 11);
+    const done = (c.n === 1 && ph >= 3) || (c.n === 2 && ph >= 6) || (c.n === 3 && ph >= 11)
+      || (c.n === 4 && ph >= 16) || (c.n === 5 && ph >= 17) || (c.n === 6 && ph >= 18);
     const now = (c.n === 1 && ph < 3) || (c.n === 2 && ph >= 3 && ph < 6)
-      || (c.n === 3 && ph >= 6 && ph < 11) || (c.n === 4 && ph >= 11);
+      || (c.n === 3 && ph >= 6 && ph < 11) || (c.n === 4 && ph >= 11 && ph < 16)
+      || (c.n === 5 && ph >= 16 && ph < 17) || (c.n === 6 && ph >= 17 && ph < 18);
     return `<div class="ch ${done ? "done" : ""} ${now ? "now" : ""}">
       <div class="chn">CHAPTER ${c.n}${done ? " — CLEARED" : now ? " — NOW" : ""}</div>
       <div class="cht">${c.title}</div>
