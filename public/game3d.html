@@ -7379,7 +7379,7 @@ function buildPaddyLife(scene) {
 
 const Foes = {
   list: [], kills: 0, wave: 0,
-  queue: [], spawnTimer: 0,
+  queue: [], spawnTimer: 0, hotZone: null,
   waveActive: false, seen: {}
 };
 
@@ -7905,13 +7905,14 @@ function spawnFoe(kind, x, z, hpScale = 1) {
     organG: m.organG || null, glowMats: m.glowMats || null, orbG: m.orbG || null,
     hp: Math.round(K.hp * hpScale), hpMax: Math.round(K.hp * hpScale),
     speed: K.speed, dmg: K.dmg,
+    homeX: x, homeZ: z,
     state: "spawn", t: 0, yaw: rand(0, TAU), atkCd: rand(.4, 1),
     hover: K.fly ? rand(.15, .5) : 0, ph: rand(0, TAU),
     strafeDir: Math.random() < .5 ? -1 : 1, strafeT: rand(1.5, 3.5),
     summoned: false, comboLeft: 0,
     dead: false, dissolve: 0, struck: false
   };
-  f.root.position.set(x, K.fly ? f.hover + groundY(x, z) : groundY(x, z) - 1.1, z);
+  f.root.position.set(x, K.fly ? f.hover + meshGroundY(x, z) : meshGroundY(x, z) - 1.1, z);
   variateFoe(f, kind);
   W3.scene.add(f.root);
   Foes.list.push(f);
@@ -7936,6 +7937,46 @@ function spawnFoe(kind, x, z, hpScale = 1) {
 }
 function spawnWraith(x, z) { return spawnFoe("wraith", x, z); }
 function spawnDrowned(x, z) { return spawnFoe("drowned", x, z); }
+
+/* ---------- hunt zones — the dead no longer crowd the gate ----------
+   Each wave's lesser dead rise scattered across the drowned fields,
+   weighted to one "hot zone" the wave quote names. They LURK there
+   until you come close, so the night is a hunt: walk the causeway,
+   wade the bunds, listen for the radar's red blips. Bosses still
+   lean on the gate — that is where the Warden has always stood. */
+const HUNT_ZONES = [
+  { x: 0,   z: 36,  r: 9,  flavor: "The gate fields stir — some of the dead still come for the gate." },
+  { x: 27,  z: 30,  r: 8,  flavor: "Embers drift over the east paddies. The dead rise between the bunds." },
+  { x: 34,  z: 12,  r: 8,  flavor: "Something circles the old watchtower. The sentries' post is not empty." },
+  { x: 11,  z: 44,  r: 9,  flavor: "The north paddies breathe. The water is not empty tonight." },
+  { x: -14, z: 42,  r: 9,  flavor: "Thunder under the west paddies — the dead walk between the bunds." },
+  { x: -23, z: 57,  r: 9,  flavor: "Far out in the deep fields, the water shivers." },
+  { x: 6,   z: 61,  r: 9,  flavor: "The temple approach moans. The old road remembers its pilgrims." },
+  { x: 22,  z: 66,  r: 7,  flavor: "Gallery water laps in the sunken temple. Its congregation stirs." },
+  { x: -27, z: -20, r: 8,  flavor: "The sacred banyan whispers. What the roots hold is waking." },
+  { x: -18, z: -25, r: 7,  flavor: "Prayer has stopped at the moonlit shrine. Something else prays now." },
+  { x: -38, z: 8,   r: 10, flavor: "The reeds hiss in the west woods. Eyes open between the trunks." },
+  { x: 20,  z: 20,  r: 8,  flavor: "The south-east woods have stopped making night sounds." },
+  { x: -20, z: 22,  r: 8,  flavor: "Cold breath drifts from the south-west woods." },
+  { x: 44,  z: 22,  r: 10, flavor: "Out in the far east fields, the drowned are calling the roll." }
+];
+function pickHuntSpot(wave) {
+  const maxD = wave <= 2 ? 42 : wave <= 4 ? 58 : 95;
+  for (let tries = 0; tries < 12; tries++) {
+    /* 60% of the wave rises in the hot zone the wave quote names */
+    const z = Foes.hotZone && Math.random() < .6 ? Foes.hotZone
+      : HUNT_ZONES[(Math.random() * HUNT_ZONES.length) | 0];
+    if (Math.hypot(z.x, z.z) > maxD) continue;
+    const a = rand(0, TAU), rr = Math.sqrt(Math.random()) * z.r;
+    const x = z.x + Math.cos(a) * rr, zz = z.z + Math.sin(a) * rr;
+    if (Math.hypot(x, zz) < World.wallR + 2.5) continue;  /* the ward would shove them out */
+    let bad = false;
+    for (const f of FLATS) if (Math.hypot(x - f.x, zz - f.z) < f.r * .75) { bad = true; break; }
+    if (bad) continue;
+    return { x, z: zz };
+  }
+  return { x: World.gate.x + rand(-8, 8), z: World.gate.z + rand(6, 12) };
+}
 
 /* ---------- waves ---------- */
 function waveComposition(n) {
@@ -7976,10 +8017,10 @@ function startWave(n) {
   Foes.spawnTimer = .6;
   Foes.waveActive = true;
   const boss = n % 5 === 0;
+  Foes.hotZone = HUNT_ZONES[(Math.random() * HUNT_ZONES.length) | 0];
   hudQuote(
     boss ? "The Neak Ta itself leans on the gate. Stand, little blade."
-      : n === 1 ? "The gate groans. Things stir in the drowned fields."
-        : "The reeds part. More of the drowned come.",
+      : Foes.hotZone.flavor,
     boss ? "THE WARDEN — WAVE " + n : "WAVE " + n);
   if (boss) SFX.wail();
 }
@@ -7994,17 +8035,23 @@ function updateSpawner(dt) {
       const kind = Foes.queue.shift();
       const boss = kind === "warden";
       Foes.spawnTimer = boss ? 2.4 : rand(1.2, 2.4);
-      const a = rand(-.8, .8);
-      const gx = World.gate.x + Math.sin(a) * 9;
-      const gz = World.gate.z + 6 + Math.abs(Math.cos(a)) * 7;
       const hpScale = Foes.wave > 5 ? 1 + (Foes.wave - 5) * .06 : 1;
-      spawnFoe(kind,
-        boss ? World.gate.x : gx + rand(-2, 2),
-        boss ? World.gate.z + 10 : gz + rand(0, 3),
-        boss ? 1 + Math.floor(Foes.wave / 10) * .25 : hpScale);
+      if (boss) {
+        spawnFoe(kind, World.gate.x, World.gate.z + 10,
+          1 + Math.floor(Foes.wave / 10) * .25);
+      } else {
+        /* scattered hunt spawn — the dead rise where they died */
+        const spot = pickHuntSpot(Foes.wave);
+        spawnFoe(kind, spot.x + rand(-2, 2), spot.z + rand(-2, 2), hpScale);
+      }
+      const tag = document.getElementById("minimapTag");
+      if (tag) tag.textContent =
+        (foesAlive() + Foes.queue.length) + " DEAD ABROAD — M MAP";
     }
   } else if (foesAlive() === 0) {
     Foes.waveActive = false;
+    const tag = document.getElementById("minimapTag");
+    if (tag) tag.textContent = "M — FULL MAP";
     onWaveCleared();
   }
 }
@@ -8117,7 +8164,7 @@ function updateFoes(dt) {
           o.material.opacity = Math.max(0, k) * (K.fly ? .88 : 1);
         }
       });
-      const gy = groundY(pos.x, pos.z);
+      const gy = meshGroundY(pos.x, pos.z);
       if (K.fly) pos.y = f.hover + (1 - k) * 1.2 + gy;
       else pos.y = gy - (1 - k) * .55;
       if (f.dissolve >= 0.8) { W3.scene.remove(f.root); Foes.list.splice(i, 1); }
@@ -8125,17 +8172,26 @@ function updateFoes(dt) {
     }
 
     if (f.state === "spawn") {
-      const gy = groundY(pos.x, pos.z);
+      const gy = meshGroundY(pos.x, pos.z);
       if (K.fly) pos.y = f.hover + (1 - Math.min(1, f.t / .9)) * 2.2 + gy;
       else pos.y = gy - (1 - Math.min(1, f.t / .9)) * 1.1;
       if (f.t > .9) { f.state = "idle"; f.t = 0; }
     }
     else if (f.state === "idle") {
-      /* drift; aggro if player outside village or close */
-      if (!inVillage || dist < 6.5) { f.state = "chase"; f.t = 0; }
+      /* LURK: the dead hold the fold of the fields they rose from.
+         They notice you only up close — or when the ward calls the
+         siege while you shelter inside the walls. Untouched, they
+         drift slowly, tethered near their rise point. */
+      const aggroR = K.boss ? 30 : (K.ranged ? 17 : 13.5);
+      if (inVillage || dist < aggroR) { f.state = "chase"; f.t = 0; }
       else {
         pos.x += Math.sin(f.t * .7 + f.ph) * dt * .8;
         pos.z += Math.cos(f.t * .6 + f.ph) * dt * .8;
+        const hd = Math.hypot(pos.x - f.homeX, pos.z - f.homeZ);
+        if (hd > 6) {
+          pos.x -= (pos.x - f.homeX) / hd * dt * 1.4;
+          pos.z -= (pos.z - f.homeZ) / hd * dt * 1.4;
+        }
       }
     }
     else if (f.state === "chase") {
@@ -8181,7 +8237,7 @@ function updateFoes(dt) {
     }
     else if (f.state === "tele") {
       /* telegraph: shake / flare */
-      if (K.fly) pos.y = f.hover + Math.sin(f.t * 40) * .04 + groundY(pos.x, pos.z);
+      if (K.fly) pos.y = f.hover + Math.sin(f.t * 40) * .04 + meshGroundY(pos.x, pos.z);
       else if (f.actor) f.actor.root.rotation.z = Math.sin(f.t * 34) * .04;
       if (f.hood) f.hood.scale.set(1.95, 1.55, .5);
       if (f.glowMats) for (const m of f.glowMats) m.color.setHex(0xffd040);
@@ -8248,7 +8304,7 @@ function updateFoes(dt) {
     /* per-frame cosmetics */
     if (K.fly) {
       if (f.state !== "tele" && f.state !== "strike") {
-        pos.y = f.hover + Math.sin(f.t * 2.1 + f.ph) * .12 + groundY(pos.x, pos.z);
+        pos.y = f.hover + Math.sin(f.t * 2.1 + f.ph) * .12 + meshGroundY(pos.x, pos.z);
       }
       f.root.rotation.y = angDamp(f.root.rotation.y, Math.atan2(pp.x - pos.x, pp.z - pos.z), 3, dt);
       f.root.rotation.z = Math.sin(f.t * 1.7 + f.ph) * .06;
@@ -8286,7 +8342,7 @@ function updateFoes(dt) {
     }
     collide(pos, K.boss ? .9 : .45);
     /* the drowned walk the terrain; spirits hover over it */
-    if (!K.fly) pos.y = damp(pos.y, groundY(pos.x, pos.z), 12, dt);
+    if (!K.fly) pos.y = damp(pos.y, meshGroundY(pos.x, pos.z), 12, dt);
 
     /* sanity aura */
     if (dist < 3) P_player.sanity = Math.max(0, P_player.sanity - dt * K.san);
@@ -8353,6 +8409,8 @@ function damageFoe(f, dmg, fromDir) {
   if (f.dead) return;
   const fx = FOE_FX[f.kind];
   f.hp -= dmg;
+  /* a struck lurker wakes: the hunt finds you now */
+  if (f.state === "idle" || f.state === "spawn") { f.state = "chase"; f.t = 0; }
   const hy = f.k.fly ? 1.2 : (f.actor ? 1.1 : 1.0);
   Particles.burst(f.root.position.x, hy, f.root.position.z,
     12, { color: fx.hit, spdMin: 1, spdMax: 3.4, sMax: .09, lifeMax: .7, grav: -7 });
@@ -14589,6 +14647,7 @@ function boot() {
     }
   }
   window.__DEBUG3D = { W3, QUEST, spawnFoe, storyMoment, setLang, BLOOD, VOICE,
+  Foes, startWave, HUNT_ZONES, pickHuntSpot,
   playerPos: () => bopha.root.position.clone(), playerYaw: () => P_player.yaw,
   playerMode: () => P_player.mode, playerDead: () => P_player.dead };
   loop();
