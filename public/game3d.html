@@ -11088,12 +11088,12 @@ function buildClimbHomes(scene) {
     const gy = pad.h;
     const lift = 1.5;
     const deckY = gy + lift;
-    World.platforms.push({ x: h.x, z: h.z, w: 4.5, d: 3.9, rot: 0, y: deckY });
-    /* stiltHouse pushes its own body + porch colliders — retag the body to
-       yield while Bopha stands on the deck, and drop the porch collider so
-       the ladder base stays reachable */
+    /* stiltHouse must sample the TERRAIN — push the deck platform only
+       after the house body exists, or groundY answers with deckY and the
+       whole house floats a storey up on dangling stilts */
     const c0 = World.colliders.length;
     stiltHouse(scene, h.x, h.z, h.rot, { w: 3.8, d: 3.2, lift, wallStyle: "plank", winSide: 1 });
+    World.platforms.push({ x: h.x, z: h.z, w: 4.5, d: 3.9, rot: 0, y: deckY });
     for (let i = c0; i < World.colliders.length; i++) {
       if (i === c0) World.colliders[i].above = deckY - .45;   /* body */
       else { World.colliders.splice(i, 1); i--; }             /* porch = ladder spot */
@@ -14042,7 +14042,7 @@ function boot() {
   window.__WEATHER = WEATHER; window.__MUSIC = MUSIC; window.__VOICE = VOICE;
   window.__VOICE_PROFILES = VOICE_PROFILES;
   window.__MAPSYS = MAPSYS; window.__STORY = STORY;
-  window.__hurtPlayer = hurtPlayer; window.__SIDEQ = SIDEQ;
+  window.__hurtPlayer = hurtPlayer; window.__SIDEQ = SIDEQ; window.__FOREST_TREES = FOREST_TREES;
   window.__Embers = Embers; window.__spawnEmber = spawnEmberPickup;
   window.__questBeat = questBeat;
   window.__combatStrike = combatStrike; window.__hudQuest = hudQuest;
