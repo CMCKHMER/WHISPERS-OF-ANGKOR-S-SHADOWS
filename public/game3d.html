@@ -804,7 +804,7 @@ function slatCrateGeo(s, color, seed = 0, slats = 3) {
   const postR = s * 0.055, inset = s * 0.42;
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
     const g = hewnGeo(s, postR, postR * 0.85, shade(rand(0.85, 1.1)), seed + sx * 3 + sz);
-    g.translate(sx * inset, s / 2, sz * inset);
+    g.translate(sx * inset, -s / 2, sz * inset);   /* crate is origin-centered; hewnGeo is base-origin */
     parts.push(g);
   }
   /* slats on both face pairs; front/back slats run along X, side slats
@@ -5714,7 +5714,7 @@ function tatterBanner(scene, x, z, col) {
   const g = new THREE.Group();
   const gy = groundY(x, z);
   const pole = new THREE.Mesh(hewnGeo(2.15, .035, .045, tint(0x4a3a26, .8, 1).getHex(), x), envMat("wood"));
-  pole.position.set(x, gy + 1.07, z); pole.rotation.z = rand(-.05, .05);
+  pole.position.set(x, gy, z); pole.rotation.z = rand(-.05, .05);   /* hewnGeo is base-origin */
   pole.castShadow = true;
   const arm = new THREE.Mesh(hewnGeo(.85, .02, .026, tint(0x4a3a26, .8, 1).getHex(), z), envMat("wood"));
   arm.position.set(x, gy + 1.95, z); arm.rotation.z = Math.PI / 2 + rand(-.08, .08);
@@ -5756,7 +5756,6 @@ function ruinedHut(scene, x, z, rot) {
   for (const [px, pz, k] of postSpots) {
     const ph = H2 * k;
     const g = hewnGeo(ph, .04, .055, tint(0x3c2e1e, .7, 1).getHex(), px * 5 + pz);
-    g.translate(0, ph / 2, 0);
     g.rotateZ(rand(-.14, .14) * (k < .4 ? 1.8 : 1));
     g.rotateX(rand(-.1, .1));
     put("wood", g, px, 0, pz);
@@ -5826,7 +5825,6 @@ function granary(scene, x, z, rot) {
   const B = { wood: [], thatch: [], plain: [], weave: [] };
   for (const [px, pz] of [[-W2 / 2, -W2 / 2], [W2 / 2, -W2 / 2], [-W2 / 2, W2 / 2], [W2 / 2, W2 / 2]]) {
     const g = hewnGeo(lift, .045, .06, tint(0x44331f, .8, 1.05).getHex(), px * 7 + pz);
-    g.translate(0, lift / 2, 0);
     g.rotateZ(rand(-.05, .05));
     put("wood", g, px, 0, pz);
     put("wood", (() => { const d = cylGeo(.19, .19, .028, tint(0x5a4630, .85, 1.05).getHex(), 8); return d; })(),
@@ -10831,7 +10829,7 @@ function skullTotem(scene, x, z, s = 1, seed = 0) {
   const gy = groundY(x, z);
   const grp = new THREE.Group();
   const pole = new THREE.Mesh(hewnGeo(1.5 * s, .05, .075, tint(0x3c2f22, .8, 1), seed), vtoonMat());
-  pole.position.y = .75 * s; grp.add(pole);
+  pole.position.y = 0; grp.add(pole);   /* hewnGeo is base-origin */
   const skull = new THREE.Mesh(sphGeo(.13 * s, tint(0xcfc4a6, .85, 1.05), 8), vtoonMat());
   skull.position.y = 1.56 * s; skull.scale.set(1, .88, 1.12); grp.add(skull);
   for (const sx of [-1, 1]) {
@@ -10851,7 +10849,7 @@ function deadTree(scene, x, z, s = 1, seed = 0) {
   const grp = new THREE.Group();
   const H = 3.6 * s + hash2(seed, 1) * 1.4;
   const trunk = new THREE.Mesh(hewnGeo(H, .13 * s, .22 * s, tint(0x2c221a, .8, 1.05), seed, 7), vtoonMat());
-  trunk.position.y = H / 2; trunk.rotation.z = rand(-.06, .06); grp.add(trunk);
+  trunk.position.y = 0; trunk.rotation.z = rand(-.06, .06); grp.add(trunk);   /* hewnGeo is base-origin */
   const nB = 3 + ((hash2(seed, 2) * 3) | 0);
   for (let i = 0; i < nB; i++) {
     const bl = (1.1 + hash2(seed, i + 3) * 1.5) * s;
@@ -10889,7 +10887,7 @@ function ladderMesh(scene, x, z, y0, y1) {
   const h = y1 - y0;
   for (const sx of [-1, 1]) {
     const rail = new THREE.Mesh(hewnGeo(h + .35, .045, .055, tint(0x4a3623, .85, 1.05), sx + 1), vtoonMat());
-    rail.position.set(sx * .22, h / 2, 0);
+    rail.position.set(sx * .22, 0, 0);   /* hewnGeo is base-origin */
     grp.add(rail);
   }
   const nR = Math.max(3, Math.round(h / .38));
@@ -11055,7 +11053,7 @@ function buildHiddenPlaces(scene) {
   /* broken bell frame — the bell itself is gone */
   for (const sx of [-1, 1]) {
     const post = new THREE.Mesh(hewnGeo(2.2, .09, .12, tint(0x3c2f22, .8, 1), sx + 5), vtoonMat());
-    post.position.set(DX + sx * 1.3, dgy + 1.1, DZ - 2.6);
+    post.position.set(DX + sx * 1.3, dgy, DZ - 2.6);   /* hewnGeo is base-origin */
     post.rotation.z = sx * .08;
     scene.add(post);
   }
@@ -12586,7 +12584,7 @@ function buildWildDressing(scene) {
     for (const [px, pz, tilt] of [[36.2, 27.4, .16], [41.8, 28.6, -.22], [37.4, 33.8, .1], [42.4, 33.2, -.12], [39.8, 25.6, .2]]) {
       const gy = groundY(px, pz);
       const post = new THREE.Mesh(hewnGeo(rand(1.2, 1.7), .06, .09, tint(0x3c2f22, .8, 1), px + pz), vtoonMat());
-      post.position.set(px, gy + .6, pz);
+      post.position.set(px, gy, pz);   /* hewnGeo is base-origin */
       post.rotation.z = tilt;
       scene.add(post);
       charmStrip(scene, px + Math.sin(tilt) * .45, gy + 1.15, pz, .5 + hash2(px, pz) * .5, px * 1.3,
