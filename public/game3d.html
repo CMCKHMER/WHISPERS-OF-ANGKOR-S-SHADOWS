@@ -466,7 +466,7 @@ function initCore() {
   renderer.setSize(innerWidth, innerHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFShadowMap;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   W3.renderer = renderer;
 
   const scene = new THREE.Scene();
@@ -3296,9 +3296,9 @@ function buildSkyLights(scene) {
   moon.position.set(-18, 26, -12);
   moon.castShadow = true;
   moon.shadow.mapSize.set(2048, 2048);
-  moon.shadow.camera.left = -30; moon.shadow.camera.right = 30;
-  moon.shadow.camera.top = 30; moon.shadow.camera.bottom = -30;
-  moon.shadow.camera.far = 100;
+  moon.shadow.camera.left = -44; moon.shadow.camera.right = 44;
+  moon.shadow.camera.top = 44; moon.shadow.camera.bottom = -44;
+  moon.shadow.camera.far = 140;
   moon.shadow.bias = -0.0016;
   moon.shadow.normalBias = 0.04;
   scene.add(moon);
@@ -3423,6 +3423,42 @@ function noiseTex(base, spots, n = 90, size = 256, rep = 8) {
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
 }
+/* moonlit ground detail: soft mud blotches, damp patches and fine grit
+   multiplied over the vertex paint — depth without breaking the palette */
+function groundDetailTex() {
+  const c = document.createElement("canvas"); c.width = c.height = 512;
+  const x = c.getContext("2d");
+  x.fillStyle = "#f4f2ea"; x.fillRect(0, 0, 512, 512);
+  for (let i = 0; i < 46; i++) {                       /* large soft blotches */
+    const bx = Math.random() * 512, by = Math.random() * 512, r = rand(34, 110);
+    const dark = Math.random() < 0.62;
+    const gr = x.createRadialGradient(bx, by, r * 0.12, bx, by, r);
+    gr.addColorStop(0, dark ? "rgba(122,108,84,0.34)" : "rgba(214,208,190,0.3)");
+    gr.addColorStop(1, "rgba(0,0,0,0)");
+    x.fillStyle = gr;
+    x.beginPath(); x.ellipse(bx, by, r, r * rand(0.55, 0.95), rand(0, TAU), 0, TAU); x.fill();
+  }
+  for (let i = 0; i < 24; i++) {                       /* worn streaks */
+    x.strokeStyle = "rgba(104,94,72,0.16)";
+    x.lineWidth = rand(3, 9);
+    x.globalAlpha = rand(0.2, 0.5);
+    x.beginPath();
+    const sx = Math.random() * 512, sy = Math.random() * 512;
+    x.moveTo(sx, sy);
+    x.bezierCurveTo(sx + rand(-70, 70), sy + rand(-70, 70), sx + rand(-90, 90), sy + rand(-90, 90), sx + rand(-130, 130), sy + rand(-130, 130));
+    x.stroke();
+  }
+  x.globalAlpha = 1;
+  for (let i = 0; i < 1500; i++) {                     /* grit */
+    x.fillStyle = Math.random() < 0.5 ? "rgba(90,80,62,0.14)" : "rgba(226,220,200,0.12)";
+    x.fillRect(Math.random() * 512, Math.random() * 512, rand(1, 2.6), rand(1, 2.6));
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(22, 22);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
 function softRingTex() {
   const c = document.createElement("canvas"); c.width = c.height = 256;
   const x = c.getContext("2d");
@@ -3524,7 +3560,7 @@ function buildGround(scene) {
   geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
   geo.computeVertexNormals();
   const gMat = vtoonMat();
-  gMat.map = noiseTex("#ffffff", ["#e8ecdf", "#ffffff", "#dde3d2", "#f0f4e8"], 130, 256, 42);
+  gMat.map = groundDetailTex();
   const ground = new THREE.Mesh(geo, gMat);
   ground.receiveShadow = true;
   scene.add(ground);
@@ -4186,8 +4222,76 @@ function swayify(mat, amp) {
 }
 
 /* lazily-built shared forest materials */
-let _trunkM = null, _leafM = null, _frondM = null, _shrubM = null, _grassM = null, _reedM = null, _flowerM = null, _fruitM = null;
-function TRUNK_M() { return _trunkM ??= vtoonMat(); }
+let _trunkM = null, _leafM = null, _frondM = null, _shrubM = null, _grassM = null, _reedM = null, _flowerM = null, _fruitM = null, _stoneMM = null;
+/* weathered bark: vertical fissures, knots, damp bands — multiplies the
+   vertex-tinted trunks without shifting the palette */
+let _barkT = null;
+function barkTex() {
+  if (_barkT) return _barkT;
+  const c = document.createElement("canvas"); c.width = 128; c.height = 256;
+  const x = c.getContext("2d");
+  x.fillStyle = "#f0ede6"; x.fillRect(0, 0, 128, 256);
+  for (let i = 0; i < 64; i++) {                       /* vertical fissures */
+    const px = Math.random() * 128;
+    x.strokeStyle = ["#8f867a", "#a49a8c", "#776f64", "#b3aa9c"][(Math.random() * 4) | 0];
+    x.globalAlpha = rand(0.22, 0.55);
+    x.lineWidth = rand(1, 3.4);
+    x.beginPath(); x.moveTo(px, -8);
+    x.bezierCurveTo(px + rand(-6, 6), 80, px + rand(-6, 6), 170, px + rand(-9, 9), 264);
+    x.stroke();
+  }
+  for (let i = 0; i < 5; i++) {                        /* knots */
+    x.globalAlpha = rand(0.3, 0.5);
+    x.strokeStyle = "#6d655a"; x.lineWidth = 2;
+    x.beginPath(); x.ellipse(Math.random() * 128, Math.random() * 256, rand(2.5, 5), rand(4, 8), 0, 0, TAU); x.stroke();
+  }
+  for (let i = 0; i < 8; i++) {                        /* damp horizontal bands */
+    x.globalAlpha = rand(0.1, 0.22);
+    x.fillStyle = "#7a7268";
+    x.fillRect(0, Math.random() * 256, 128, rand(3, 14));
+  }
+  x.globalAlpha = 1;
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(1.6, 1);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return _barkT = t;
+}
+/* lichen-mottled, cracked stone for boulders and termites' neighbours */
+let _stoneTexT = null;
+function stoneTex() {
+  if (_stoneTexT) return _stoneTexT;
+  const c = document.createElement("canvas"); c.width = c.height = 256;
+  const x = c.getContext("2d");
+  x.fillStyle = "#efeeea"; x.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 60; i++) {
+    const bx = Math.random() * 256, by = Math.random() * 256, r = rand(6, 34);
+    x.fillStyle = ["#c8c4b8", "#b0aa9c", "#d8d4c8", "#9a948a", "#a8a894"][(Math.random() * 5) | 0];
+    x.globalAlpha = rand(0.18, 0.4);
+    x.beginPath(); x.ellipse(bx, by, r, r * rand(0.5, 1), rand(0, TAU), 0, TAU); x.fill();
+  }
+  for (let i = 0; i < 14; i++) {                       /* hairline cracks */
+    x.strokeStyle = "rgba(70,66,58,0.4)"; x.lineWidth = rand(0.7, 1.6);
+    x.globalAlpha = rand(0.3, 0.6);
+    x.beginPath();
+    let cx = Math.random() * 256, cy = Math.random() * 256;
+    x.moveTo(cx, cy);
+    for (let k = 0; k < 4; k++) { cx += rand(-26, 26); cy += rand(-26, 26); x.lineTo(cx, cy); }
+    x.stroke();
+  }
+  x.globalAlpha = 1;
+  for (let i = 0; i < 700; i++) {
+    x.fillStyle = Math.random() < 0.5 ? "rgba(80,76,66,0.15)" : "rgba(240,238,228,0.16)";
+    x.fillRect(Math.random() * 256, Math.random() * 256, rand(1, 2.4), rand(1, 2.4));
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(1.6, 1.6);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return _stoneTexT = t;
+}
+function STONE_M() { return _stoneMM ??= (() => { const m = vtoonMat(); m.map = stoneTex(); return m; })(); }
+function TRUNK_M() { return _trunkM ??= (() => { const m = vtoonMat(); m.map = barkTex(); return m; })(); }
 function LEAF_M() { return _leafM ??= swayify(vtoonMat(), 0.012); }
 function FROND_M() { return _frondM ??= swayify(vtoonMat({ side: THREE.DoubleSide }), 0.018); }
 function SHRUB_M() { return _shrubM ??= swayify(vtoonMat(), 0.3); }
@@ -4280,6 +4384,11 @@ function treeBroad(bk, x, z, s) {
     setVertColor(g, c);
     g.translate(bx, by, bz);
     bk.leaf.push(g);
+    /* inner shade blob — layered foliage reads as depth, not lollipops */
+    const gi = jitterGeo(sphGeo(br * 0.58, 0xffffff, 7), br * 0.26, i * 5.1 + 9);
+    setVertColor(gi, c.clone().multiplyScalar(0.58));
+    gi.translate(bx - ca * 0.16, by - br * 0.3, bz - sa * 0.16);
+    bk.leaf.push(gi);
   }
   /* hanging vines on some trees */
   if (Math.random() < 0.45) {
@@ -4393,6 +4502,11 @@ function treeKapok(bk, x, z, s) {
     setVertColor(g, c);
     g.translate(bx, by, bz);
     bk.leaf.push(g);
+    /* inner shade blob — layered foliage depth */
+    const gi = jitterGeo(sphGeo(br * 0.58, 0xffffff, 7), br * 0.28, i * 5.3 + 11);
+    setVertColor(gi, c.clone().multiplyScalar(0.56));
+    gi.translate(bx, by - br * 0.32, bz);
+    bk.leaf.push(gi);
   }
   pushCollider(x, z, 0.7 * s);
 }
@@ -4955,7 +5069,7 @@ function buildForest(scene) {
   if (termites.length) { const m = new THREE.Mesh(mergeGeos(termites), TRUNK_M()); m.castShadow = true; m.receiveShadow = true; scene.add(m); }
   if (logs.length) { const m = new THREE.Mesh(mergeGeos(logs), TRUNK_M()); m.castShadow = true; scene.add(m); }
   if (stumps.length) { const m = new THREE.Mesh(mergeGeos(stumps), TRUNK_M()); m.castShadow = true; scene.add(m); }
-  if (rocks.length) { const m = new THREE.Mesh(mergeGeos(rocks), TRUNK_M()); m.castShadow = true; m.receiveShadow = true; scene.add(m); }
+  if (rocks.length) { const m = new THREE.Mesh(mergeGeos(rocks), STONE_M()); m.castShadow = true; m.receiveShadow = true; scene.add(m); }
 }
 
 /* ---------- instanced scatter helper ---------- */
@@ -5004,7 +5118,7 @@ function buildScatter(scene) {
   })();
   const gSpots = [];
   const cTmp = new THREE.Color();
-  for (let i = 0; i < 6000 && gSpots.length < 2600; i++) {
+  for (let i = 0; i < 8200 && gSpots.length < 3400; i++) {
     const a = Math.random() * TAU, rr = Math.sqrt(Math.random()) * 68;
     const x = Math.sin(a) * rr, z = Math.cos(a) * rr;
     const n = fbm(x * 0.21 + 31, z * 0.21 + 17);
@@ -6104,6 +6218,52 @@ function stiltHouse(scene, x, z, rot, opts = {}) {
     const rg = hewnGeo(w - 0.1, 0.024, 0.03, 0x54402a, 23);
     rg.rotateZ(-Math.PI / 2); rg.translate(-(w - 0.1) / 2, 0, 0);
     put("wood", rg, 0, lift + 0.44, d / 2 + porchD - 0.08, 0, 0, rand(-.04, .04));
+  }
+
+  /* sagged cloth canopy over the porch front + rope ties to the eave */
+  {
+    const cw = w * 0.92, cd = porchD * 0.9;
+    const cg = new THREE.PlaneGeometry(cw, cd, 7, 3);
+    const cp = cg.attributes.position;
+    for (let i = 0; i < cp.count; i++) {
+      const ux = cp.getX(i) / (cw / 2), uy = cp.getY(i) / (cd / 2);
+      cp.setZ(i, cp.getZ(i)
+        - (Math.sin(ux * Math.PI * 0.5 + Math.PI * 0.25) * 0.5 + 0.5) * 0.16
+        - Math.pow(Math.max(0, uy), 2) * 0.1
+        - (Math.sin(ux * 9.3 + 1.7) * 0.02 + Math.sin(uy * 7.1) * 0.015));
+    }
+    setVertColor(cg, tint(0x7a3a30, 0.85, 1.08));
+    cg.rotateX(-Math.PI / 2 + 0.16);
+    cg.translate(0, lift + 0.78, d / 2 + porchD / 2 - 0.05);
+    B.ds.push(cg);
+    for (const sx of [-1, 1]) {
+      const cord = cylGeo(0.012, 0.012, 0.42, 0x8a6d42, 5);
+      cord.translate(0, -0.21, 0);
+      cord.rotateZ(sx * 0.5); cord.rotateX(-0.35);
+      put("wood", cord, sx * (cw / 2 - 0.05), lift + 0.98, d / 2 + porchD - 0.28);
+    }
+  }
+  /* rope lashings on the corner posts — two weathered wraps each */
+  for (const [px, pz] of postCols) {
+    if (Math.abs(px) < w * 0.3) continue;               /* mid posts stay bare */
+    for (let k = 0; k < 2; k++) {
+      const band = cylGeo(0.105 * m + 0.035, 0.105 * m + 0.035, 0.045, 0x8a6d42, 7);
+      band.rotateX(Math.PI / 2);
+      band.rotateZ(rand(-0.06, 0.06));
+      put("wood", band, px, lift - 0.16 - k * 0.17, pz);
+    }
+  }
+  /* hanging pot + herb bundle under the eave lip */
+  {
+    const hx = w * 0.3, hz = d / 2 + 0.18;
+    put("wood", cylGeo(0.008, 0.008, 0.3, 0x6a5638, 4), hx, lift + wallH + 0.1, hz);
+    const pot = sphGeo(0.11, 0x8a5a38, 8);
+    pot.scale(1, 0.82, 1);
+    put("plain", pot, hx, lift + wallH - 0.08, hz);
+    const herb = coneGeo(0.05, 0.2, 0x2e4426, 6);
+    herb.rotateX(Math.PI);
+    put("plain", herb, -w * 0.34, lift + wallH - 0.06, hz + 0.1);
+    put("wood", cylGeo(0.007, 0.007, 0.22, 0x6a5638, 4), -w * 0.34, lift + wallH + 0.06, hz + 0.1);
   }
 
   /* access: ladder or notched log stair */
@@ -10811,6 +10971,301 @@ function groundMist(scene, x, z, s = 1) {
     m.material.opacity = .26 + Math.sin(t * .35 + ph) * .1;
   });
 }
+/* ============================================================
+   DETAIL PASS — baked ground occlusion, contact shadows, lantern
+   light pools, ground litter, mud, undergrowth. Merged layers keep
+   the whole pass at ~10 draw calls.
+   ============================================================ */
+let _aoSoftT = null, _aoHardT = null, _poolT = null, _mudT = null;
+function radialTex(stops) {
+  const c = document.createElement("canvas"); c.width = c.height = 128;
+  const x = c.getContext("2d");
+  const g = x.createRadialGradient(64, 64, 4, 64, 64, 63);
+  for (const [p, col] of stops) g.addColorStop(p, col);
+  x.fillStyle = g; x.fillRect(0, 0, 128, 128);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+function aoSoftT() { return _aoSoftT ??= radialTex([[0, "rgba(8,10,14,0.62)"], [0.55, "rgba(8,10,14,0.26)"], [1, "rgba(8,10,14,0)"]]); }
+function aoHardT() { return _aoHardT ??= radialTex([[0, "rgba(6,8,12,0.8)"], [0.45, "rgba(6,8,12,0.34)"], [1, "rgba(6,8,12,0)"]]); }
+function poolT() { return _poolT ??= radialTex([[0, "rgba(255,225,170,0.9)"], [0.4, "rgba(255,190,110,0.34)"], [1, "rgba(255,170,80,0)"]]); }
+function mudT() { return _mudT ??= radialTex([[0, "rgba(58,46,30,0.5)"], [0.5, "rgba(52,42,28,0.3)"], [1, "rgba(48,38,26,0)"]]); }
+
+/* one merged mesh per transparency tier; quads hug the terrain at the
+   centre height + 0.07 so gentle slopes stay hidden */
+function mergedQuads(scene, spots, tex, blending, opacity) {
+  if (!spots.length) return;
+  const parts = [];
+  for (const [x, z, w, d, tintC] of spots) {
+    const g = new THREE.PlaneGeometry(w, d);
+    g.rotateX(-Math.PI / 2);
+    g.translate(x, groundY(x, z) + 0.07, z);
+    if (tintC) setVertColor(g, tintC); else setVertColor(g, 0xffffff);
+    parts.push(g);
+  }
+  const m = new THREE.Mesh(mergeGeos(parts), new THREE.MeshBasicMaterial({
+    map: tex, transparent: true, opacity, depthWrite: false,
+    vertexColors: true, blending, side: THREE.DoubleSide
+  }));
+  m.material.polygonOffset = true; m.material.polygonOffsetFactor = -4; m.material.polygonOffsetUnits = -4;
+  m.renderOrder = 2;
+  m.frustumCulled = false;
+  scene.add(m);
+}
+
+/* soft moonlight occlusion baked into the terrain vertex paint */
+function bakeGroundAO(scene) {
+  let gm = null;
+  scene.traverse(o => { if (o.isMesh && o.geometry && o.geometry.attributes.position && o.geometry.attributes.position.count === 12321 && o.geometry.attributes.color) gm = o; });
+  if (!gm) return;
+  const col = gm.geometry.attributes.color, pos = gm.geometry.attributes.position;
+  const trees = FOREST_TREES || [];
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), z = pos.getZ(i);
+    let v = 1;
+    const fd = forestDensity(x, z);
+    if (fd > 0.05) v *= 1 - 0.1 * fbm(x * 0.43 + 91, z * 0.43 + 13) * fd;   /* canopy dapple */
+    for (const t of trees) {
+      const d = Math.hypot(x - t.x, z - t.z), rr = 1.5 + t.s * 1.3;
+      if (d < rr) v *= 1 - 0.17 * sstep(rr, rr * 0.25, d);
+    }
+    for (const f of FLATS) {
+      const d = Math.hypot(x - f.x, z - f.z), e = Math.exp(-Math.pow(d - f.r * 0.82, 2) / 0.6);
+      v *= 1 - 0.13 * e;                                                  /* pad-edge contact */
+    }
+    col.setXYZ(i, col.getX(i) * v, col.getY(i) * v, col.getZ(i) * v);
+  }
+  col.needsUpdate = true;
+}
+
+/* lantern/fire glow spilled onto the ground around every light source */
+function buildGlowPools(scene) {
+  const pools = [];
+  const warm = (x, z, r, k, c) => pools.push([x, z, r, k, c]);
+  warm(3.4, -1.6, 3.4, 1.15, [1, 0.62, 0.3]);                 /* campfire */
+  warm(9.5, 2, 2.7, 0.8, [1, 0.72, 0.38]);                    /* Neak Ta shrine */
+  warm(-8.5, 7.5, 2.5, 0.8, [1, 0.6, 0.28]);                  /* Veasna's forge */
+  warm(-6.5, 5.5, 2.1, 0.6, [1, 0.7, 0.36]);                  /* rice stall */
+  warm(6.5, 7.5, 2.1, 0.6, [0.6, 0.85, 1]);                   /* Tevy's charms — cool */
+  warm(8.2, 4.6, 1.7, 0.55, [1, 0.66, 0.3]);                  /* spirit house */
+  warm(-12.3, -9.9, 2, 0.6, [0.55, 0.9, 0.7]);                /* herb hut — sickly green */
+  warm(0, 28.5, 2.5, 0.55, [0.62, 0.8, 1]);                   /* gate lanterns — moon-blue */
+  for (const [bx, bz] of [[17, 62.5], [27, 62.5], [22, 70.5]]) warm(bx, bz, 2.3, 0.9, [1, 0.58, 0.26]);
+  for (const [hx, hz] of HOUSE_SPOTS) warm(hx, hz, 1.9, 0.42, [1, 0.68, 0.34]);
+  for (const [hx, hz] of [[16, -3], [-19, 1.5]]) warm(hx, hz, 2.2, 0.5, [1, 0.68, 0.34]);
+  const spots = pools.map(([x, z, r, k, c]) => [x, z, r * 2, r * 2, new THREE.Color(c[0] * k, c[1] * k, c[2] * k)]);
+  mergedQuads(scene, spots, poolT(), THREE.AdditiveBlending, 0.5);
+}
+
+/* contact shadows under the big structures and dead landmarks */
+function buildContactAO(scene) {
+  const soft = [], hard = [];
+  for (const f of FLATS) soft.push([f.x, f.z, f.r * 2.5, f.r * 2.1]);
+  for (const [x, z, s] of [[5, 47.5, 1.1], [-6, 51, .95], [18, 52, 1.2], [-14, 51, 1], [30, 40, 1.15], [-26, 36, 1], [14, 70, 1.3], [-24, 68, 1.1], [9, 34.5, .85], [-11, 33, .9], [26, 14, 1.3], [-29, 38, 1]])
+    hard.push([x, z, 2.6 * s + 1.2, 2.6 * s + 1.2]);
+  for (const [x, z] of [[2.6, 30.5], [13, 57], [-19.5, 34.5]]) hard.push([x, z, 2.2, 2.2]);
+  hard.push([9, 60, 2.6, 2.6]);                               /* causeway cairn */
+  mergedQuads(scene, soft, aoSoftT(), THREE.NormalBlending, 0.75);
+  mergedQuads(scene, hard, aoHardT(), THREE.NormalBlending, 0.8);
+}
+
+/* mud patches along the bunds and the path shoulders */
+function buildMudPatches(scene) {
+  const spots = [];
+  for (const p of PADIES) {
+    const n = 3 + (Math.random() * 3 | 0);
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * TAU;
+      const d = (Math.max(p.w, p.d) / 2 - 0.4) + rand(0.2, 0.9);
+      const x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d;
+      spots.push([x, z, rand(1.4, 2.8), rand(1.1, 2.2)]);
+    }
+  }
+  for (let i = 0; i < 9; i++) {
+    const x = rand(-24, 26), z = rand(-24, 30);
+    const pd = pathDist(x, z);
+    if (pd > 0.8 && pd < 2.4) spots.push([x, z, rand(1.2, 2.4), rand(1, 2)]);
+  }
+  mergedQuads(scene, spots, mudT(), THREE.NormalBlending, 0.55);
+}
+
+/* ground litter + undergrowth, instanced: pebbles, roots, leaves,
+   potsherds, ferns, bushes */
+function buildDetailScatter(scene) {
+  const badSpot = (x, z) => {
+    if (Math.abs(x) < 5 && z > 20 && z < 32) return true;      /* gate corridor */
+    if (pathDist(x, z) < 1.05) return true;                    /* walkways stay clear */
+    for (const p of PADIES) if (rectDist(x, z, p) < 0.6) return true;
+    for (const f of FLATS) if (Math.hypot(x - f.x, z - f.z) < f.r + 0.9) return true;
+    for (const n of World.noGrow || []) if (rectDist(x, z, n) < 0.7) return true;
+    return false;
+  };
+  const scatter = (n, tryN, fn) => {
+    const out = [];
+    for (let i = 0; i < tryN && out.length < n; i++) {
+      const a = Math.random() * TAU, rr = Math.sqrt(Math.random()) * 70;
+      const x = Math.sin(a) * rr, z = Math.cos(a) * rr;
+      if (badSpot(x, z)) continue;
+      out.push([x, z]);
+    }
+    return out;
+  };
+  const cT = new THREE.Color(), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), v3 = new THREE.Vector3(), s3 = new THREE.Vector3();
+  const inst = (geo, mat, spots, place, colr) => {
+    const im = new THREE.InstancedMesh(geo, mat, spots.length);
+    spots.forEach(([x, z], i) => {
+      place(x, z, i);
+      im.setMatrixAt(i, m4);
+      if (colr) { im.setColorAt(i, cT); }
+    });
+    im.instanceMatrix.needsUpdate = true;
+    if (im.instanceColor) im.instanceColor.needsUpdate = true;
+    im.frustumCulled = false;
+    scene.add(im);
+    return im;
+  };
+  /* pebbles — creek-worn, clustered by noise */
+  const pebGeo = (() => {
+    const parts = [];
+    for (let i = 0; i < 2; i++) {
+      const g = jitterGeo(new THREE.IcosahedronGeometry(1, 0), 0.24, i * 7 + 2);
+      g.scale(rand(0.7, 1), rand(0.5, 0.8), rand(0.8, 1));
+      g.translate(rand(-0.5, 0.5), 0, rand(-0.4, 0.4));
+      parts.push(g);
+    }
+    return mergeGeos(parts);
+  })();
+  const pebSpots = scatter(2000, 5200).filter(([x, z]) => Math.random() < (forestDensity(x, z) > 0.3 ? 0.95 : 0.45));
+  inst(pebGeo, TRUNK_M(), pebSpots, (x, z, i) => {
+    const s = rand(0.05, 0.15) * (fbm(x * 0.3 + 5, z * 0.3 + 9) > 0.55 ? 1.4 : 0.9);
+    e.set(0, rand(0, TAU), 0); q.setFromEuler(e);
+    v3.set(x, groundY(x, z) + s * 0.22, z); s3.set(s, s * 0.8, s);
+    m4.compose(v3, q, s3);
+    const g2 = rand(0.24, 0.42);
+    cT.setRGB(g2, g2 * 0.97, g2 * 0.9);
+  }, true);
+  /* roots & fallen twigs — half-buried, windfall arcs */
+  const twigGeo = (() => {
+    const parts = [];
+    let px = -0.5, py = 0;
+    for (let i = 0; i < 3; i++) {
+      const seg = cylGeo(0.02, 0.026, 0.5, 0xffffff, 5);
+      seg.rotateZ(Math.PI / 2 + rand(-0.3, 0.3));
+      seg.rotateY(rand(-0.5, 0.5));
+      seg.translate(px, 0.02, 0);
+      parts.push(seg);
+      px += 0.44;
+    }
+    const fork = cylGeo(0.012, 0.018, 0.3, 0xffffff, 4);
+    fork.rotateZ(Math.PI / 2 + rand(0.6, 1));
+    fork.translate(rand(-0.3, 0.3), 0.05, rand(-0.15, 0.15));
+    parts.push(fork);
+    return mergeGeos(parts);
+  })();
+  const twigSpots = scatter(700, 1900).filter(([x, z]) => forestDensity(x, z) > 0.15 || Math.random() < 0.3);
+  inst(twigGeo, TRUNK_M(), twigSpots, (x, z, i) => {
+    const s = rand(0.3, 0.85);
+    e.set(rand(-0.08, 0.08), rand(0, TAU), rand(-0.08, 0.08)); q.setFromEuler(e);
+    v3.set(x, groundY(x, z) + 0.02, z); s3.set(s, s, s);
+    m4.compose(v3, q, s3);
+    const b = rand(0.32, 0.5);
+    cT.setRGB(b, b * 0.82, b * 0.62);
+  }, true);
+  /* fallen leaves — amber drifts pooling in the forest, sparse in the open */
+  const leafGeo = (() => {
+    const g = new THREE.PlaneGeometry(0.16, 0.11);
+    g.rotateX(-Math.PI / 2);
+    g.rotateY(rand(0, TAU));
+    return g;
+  })();
+  const leafSpots = scatter(1700, 4200).filter(([x, z]) => Math.random() < (forestDensity(x, z) > 0.3 ? 0.92 : 0.3));
+  inst(leafGeo, FLOWER_M(), leafSpots, (x, z, i) => {
+    e.set(rand(-0.16, 0.16), rand(0, TAU), rand(-0.16, 0.16)); q.setFromEuler(e);
+    v3.set(x, groundY(x, z) + 0.03, z); s3.set(rand(0.7, 1.5), 1, rand(0.7, 1.5));
+    m4.compose(v3, q, s3);
+    cT.setHSL(rand(0.055, 0.11), rand(0.45, 0.7), rand(0.16, 0.3));
+  }, true);
+  /* potsherds & rusted odds near the paths — the village's leavings */
+  const sherdGeo = (() => {
+    const parts = [];
+    const g = new THREE.PlaneGeometry(0.14, 0.1);
+    g.rotateX(-Math.PI / 2 + rand(-0.3, 0.3));
+    parts.push(g);
+    const c2 = coneGeo(0.05, 0.06, 0xffffff, 5);
+    c2.translate(rand(-0.2, 0.2), 0.03, rand(-0.2, 0.2));
+    parts.push(c2);
+    return mergeGeos(parts);
+  })();
+  const sherdSpots = [];
+  for (let i = 0; i < 300 && sherdSpots.length < 90; i++) {
+    const x = rand(-26, 26), z = rand(-26, 30);
+    const pd = pathDist(x, z);
+    if (pd < 0.9 || pd > 3.2) continue;
+    if (badSpot(x, z)) continue;
+    sherdSpots.push([x, z]);
+  }
+  inst(sherdGeo, TRUNK_M(), sherdSpots, (x, z, i) => {
+    e.set(0, rand(0, TAU), rand(-0.2, 0.2)); q.setFromEuler(e);
+    v3.set(x, groundY(x, z) + 0.02, z); s3.set(rand(0.6, 1.3), 1, rand(0.6, 1.3));
+    m4.compose(v3, q, s3);
+    cT.setRGB(rand(0.45, 0.6), rand(0.3, 0.4), rand(0.24, 0.32));
+  }, true);
+  /* ferns — arching frond fans on the forest edges */
+  const fernGeo = (() => {
+    const parts = [];
+    for (let i = 0; i < 7; i++) {
+      const fr = new THREE.PlaneGeometry(0.1, 0.52, 1, 2);
+      fr.translate(0, 0.26, 0);
+      fr.rotateX(-0.5 - (i % 3) * 0.3);
+      fr.rotateY(i / 7 * TAU + rand(-0.2, 0.2));
+      gradY(fr, 0x1a3320, 0x2f5230, 0.15);
+      parts.push(fr);
+    }
+    return mergeGeos(parts);
+  })();
+  const fernSpots = scatter(430, 1600).filter(([x, z]) => { const fd = forestDensity(x, z); return fd > 0.22 && fd < 0.85; });
+  inst(fernGeo, FLOWER_M(), fernSpots, (x, z, i) => {
+    const s = rand(0.6, 1.3);
+    e.set(0, rand(0, TAU), 0); q.setFromEuler(e);
+    v3.set(x, groundY(x, z) - 0.02, z); s3.set(s, s * rand(0.8, 1.25), s);
+    m4.compose(v3, q, s3);
+    cT.setHSL(0.34 + rand(-0.03, 0.03), rand(0.3, 0.5), rand(0.14, 0.24));
+  }, true);
+  /* bushes — three-blob shrubs filling the forest floor */
+  const bushGeo = (() => {
+    const parts = [];
+    const stub = cylGeo(0.05, 0.07, 0.3, 0xffffff, 5);
+    stub.translate(0, 0.15, 0);
+    parts.push(stub);
+    for (let i = 0; i < 3; i++) {
+      const g = jitterGeo(sphGeo(rand(0.26, 0.42), 0xffffff, 7), 0.12, i * 3.3 + 1);
+      g.translate(rand(-0.22, 0.22), 0.32 + rand(0, 0.2), rand(-0.22, 0.22));
+      parts.push(g);
+    }
+    return mergeGeos(parts);
+  })();
+  const bushSpots = scatter(230, 900).filter(([x, z]) => forestDensity(x, z) > 0.4);
+  inst(bushGeo, SHRUB_M(), bushSpots, (x, z, i) => {
+    const s = rand(0.7, 1.5);
+    e.set(0, rand(0, TAU), 0); q.setFromEuler(e);
+    v3.set(x, groundY(x, z) - 0.03, z); s3.set(s, s * rand(0.85, 1.2), s);
+    m4.compose(v3, q, s3);
+    cT.setHSL(0.33 + rand(-0.03, 0.03), rand(0.35, 0.55), rand(0.12, 0.2));
+  }, true);
+}
+
+function buildDetailPass(scene) {
+  bakeGroundAO(scene);
+  buildContactAO(scene);
+  buildGlowPools(scene);
+  buildMudPatches(scene);
+  buildDetailScatter(scene);
+  /* low river mist clinging to the paddies and the causeway */
+  for (const [x, z, s] of [[0, 40, 1.8], [-14, 42, 1.5], [14, 44, 1.6], [0, 50, 1.7], [22, 60, 1.5], [-6, 29, 1.3], [10, 30, 1.3], [-24, 68, 1.4]])
+    groundMist(scene, x, z, s);
+}
+
 function charmStrip(scene, x, y, z, len, seed, col) {
   /* geometry is baked vertical (plankGeo's long axis Z -> world Y) so the
      strip HANGS from its tie point; mesh euler flutter stays pendulum-like */
@@ -11428,6 +11883,7 @@ function buildExplore(scene) {
   buildWildDressing(scene);
   buildVillageStory(scene);
   buildAtmos(scene);
+  buildDetailPass(scene);
   console.log("EXPLORE: prasat, landmarks, hidden places, climbs, haunt deco, wilds dressing, village story, atmosphere");
 }
 
