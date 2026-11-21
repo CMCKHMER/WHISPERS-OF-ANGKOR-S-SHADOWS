@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 
 /* Keys we let through to the game and preventDefault on the parent
    (stops arrow-key page scrolling / Tab focus jumping while the
@@ -9,7 +9,6 @@ const GAME_KEYS = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " ", "Tab"
 
 export default function GameFrame() {
   const frameRef = useRef<HTMLIFrameElement | null>(null);
-  const [mode3d, setMode3d] = useState(true);
 
   useEffect(() => {
     // Forward parent-page keyboard events into the game iframe so the
@@ -43,7 +42,7 @@ export default function GameFrame() {
       clearTimeout(t1);
       clearTimeout(t2);
     };
-  }, [mode3d]);
+  }, []);
 
   return (
     <main
@@ -75,9 +74,8 @@ export default function GameFrame() {
         Whispers of Angkor&apos;s Shadows — a dark Khmer folklore RPG
       </h1>
       <iframe
-        key={mode3d ? "3d" : "2d"}
         ref={frameRef}
-        src={mode3d ? "/game3d.html" : "/game.html"}
+        src="/game3d.html"
         title="Whispers of Angkor's Shadows — playable game"
         style={{
           width: "100%",
@@ -87,47 +85,6 @@ export default function GameFrame() {
         }}
         allow="autoplay"
       />
-      <div
-        style={{
-          position: "absolute",
-          top: 14,
-          right: 16,
-          display: "flex",
-          gap: 8,
-          zIndex: 10,
-        }}
-      >
-        <button
-          onClick={() => setMode3d(true)}
-          style={{
-            font: "12px Georgia, serif",
-            letterSpacing: "1px",
-            color: mode3d ? "#0a0f0d" : "#f3ead2",
-            background: mode3d ? "rgba(214,169,74,.9)" : "rgba(4,10,9,.72)",
-            border: "1px solid rgba(214,169,74,.6)",
-            borderRadius: 3,
-            padding: "6px 14px",
-            cursor: "pointer",
-          }}
-        >
-          3D REMAKE
-        </button>
-        <button
-          onClick={() => setMode3d(false)}
-          style={{
-            font: "12px Georgia, serif",
-            letterSpacing: "1px",
-            color: !mode3d ? "#0a0f0d" : "#f3ead2",
-            background: !mode3d ? "rgba(112,232,255,.85)" : "rgba(4,10,9,.72)",
-            border: "1px solid rgba(112,232,255,.5)",
-            borderRadius: 3,
-            padding: "6px 14px",
-            cursor: "pointer",
-          }}
-        >
-          2D CLASSIC
-        </button>
-      </div>
     </main>
   );
 }

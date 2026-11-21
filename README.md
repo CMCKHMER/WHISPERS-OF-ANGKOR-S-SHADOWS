@@ -31,11 +31,23 @@ A landing page lives at the
   voice, cast per character (female voices for the women of Sambok Chas,
   male voices for the smith, the warden, the elder and the things that
   whisper). Toggle under TAB → Settings.
+- **Full Khmer language option** — TAB → Settings → Language switches the
+  interface, quest panel, chapter cutscenes AND the dialogue to ភាសាខ្មែរ.
+  The recorded voices stay English under the Khmer text (they are keyed to
+  the original lines); the few untranslated edge lines fall back to English
+  gracefully.
+- **Side errands** — three optional tasks open after chapter 1: feed Srey
+  Noch's dark grave-slabs, fetch Dara's kite from the dead tree east, and
+  raise the Warden's three tally-stakes. They pay in riel, items and
+  relics, and never gate the six-chapter plot.
+- **Combat depth** — hold a strike to pour the swing into a heavy finisher
+  (wider arc, knockback, shockwave); dodge *through* an enemy's blow for a
+  perfect-dodge riposte — the night slows, the dagger burns, and your next
+  strikes hit ~70% harder; from wave 6 the court's ember-crowned HEXERs
+  join the endless night (faster than shades, worth honest coin), and from
+  wave 10 they bodyguard the warden.
 - **AI-painted chapter cutscenes** — each chapter opens on a generated,
   painterly folk-horror illustration.
-- **Khmer language option** — TAB → Settings → Language switches the interface
-  (menus, vitals, quest headers, chronicle) to ភាសាខ្មែរ; dialogue lines stay
-  English for now.
 - **Blood & gore toggle** — arterial spurts, ground pools and a hurt vignette;
   spirits bleed nothing. Toggle under TAB → Settings.
 - **Directional jumping** — F jumps along your movement vector with mid-air
@@ -45,6 +57,12 @@ A landing page lives at the
 - **Living monsters** — foes spawn with per-instance scale/tilt/hue variation,
   tattered cloth, bone ornaments, tendril strands and rim-light halos; no two
   look alike.
+- **Touch controls** — on phones and tablets the game shows a virtual
+  joystick (edge push = sprint) and an action cluster (strike, dodge, jump,
+  talk, blessings); one finger orbits the camera. Hold the strike button for
+  the heavy finisher. `?touch=1` forces the layout for desktop testing.
+- **Adaptive quality** — if the frame rate sags below 24 fps, the renderer
+  steps down gradually (pixel ratio → shadows → fog) instead of stuttering.
 
 ## Play locally
 
@@ -60,13 +78,16 @@ Production: `npm run build`, then `npm start` (serves the standalone build).
 | Key | Action |
 | --- | --- |
 | WASD / Arrows | Move · SHIFT sprint · SPACE dodge · F jump |
-| LMB / J | Strike (3-hit chain) |
+| LMB / J | Strike (3-hit chain) · **hold for the heavy finisher** |
 | E | Talk / search / interact |
 | **1–4** | **Blessings (magic):** Moonward Step · Krasue Fire · Neak Coil · Apsara Blessing |
 | **H / C / X / G** | **Use items:** Lotus Poultice · Incense · Rice Offering · Luck-Knot Charm |
 | Q · R / drag | Camera · wheel zoom |
 | V | Curse-vision |
 | M | Full map · TAB/P pause |
+
+*On touch devices a joystick + action cluster replace the keyboard;
+the layout also force-starts with `?touch=1`.*
 
 ## Systems
 
@@ -80,8 +101,8 @@ Production: `npm run build`, then `npm start` (serves the standalone build).
   advance; cooldowns and costs live in the spell slots bottom-left.
 - **Items** — the belt bottom-right: heal, curse-sight, pacify the hungry
   dead, halve incoming damage.
-- **Missions** — the quest panel (top right) tracks every chapter objective;
-  the chronicle (TAB) retells the story so far.
+- **Missions** — the quest panel (top right) tracks every chapter objective
+  plus any accepted side errand; the chronicle (TAB) retells the story so far.
 
 ## Stack
 
@@ -91,6 +112,8 @@ procedural models, WebAudio score, no game-engine dependencies.
 
 ## Repo notes
 
+The retired 2D build (`public/game.html`) was removed in v0.3.0; the 3D
+game is the only entry point.
 `tests/` are infra checks for the `.zscripts` runtime harness, not game tests.
 Lint scope (`eslint.config.mjs`) intentionally covers `src/**` only —
 `public/` holds minified game bundles.
