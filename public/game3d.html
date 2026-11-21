@@ -274,7 +274,7 @@
   <div id="combo"><div class="n" id="comboN">3</div><div class="t">HIT COMBO</div></div>
   <div id="quote"></div>
   <div id="interactTip"></div>
-  <div id="hintbar">WASD / Arrows move · SHIFT sprint · LMB/J strike · SPACE dodge · E talk · 1–4 blessings · H heal · C incense · X rice · G charm · Drag / Q·R look · V curse-vision · M map · TAB menu</div>
+  <div id="hintbar">WASD / Arrows move · SHIFT sprint · LMB/J strike (hold = heavy) · SPACE dodge · E talk · 1–4 blessings · H heal · C incense · X rice · G charm · Drag / Q·R look · V curse-vision · M map · TAB menu</div>
 
   <div id="fullmap">
     <h2>SAMBOK CHAS — THE DROWNED VILLAGE</h2>
@@ -310,7 +310,7 @@
 
   <div id="pausePanel">
     <h2>PAUSED</h2>
-    <div class="tip">WASD / Arrows move · SHIFT sprint · LMB strike · SPACE dodge<br>E interact · 1–4 blessings · H heal · C incense · X rice · G charm · Drag / Q·R look · Wheel zoom · V curse-vision · TAB/P resume · M map</div>
+    <div class="tip">WASD / Arrows move · SHIFT sprint · LMB strike (hold = heavy) · SPACE dodge<br>E interact · 1–4 blessings · H heal · C incense · X rice · G charm · Drag / Q·R look · Wheel zoom · V curse-vision · TAB/P resume · M map</div>
     <div id="pauseBtns">
       <button class="menuBtn small" id="resumeBtn">RESUME</button>
       <button class="menuBtn small" id="mapBtn">MAP</button>
@@ -336,7 +336,7 @@
     <div class="sub">— a dark Khmer folklore action RPG · 3D —</div>
     <button class="menuBtn" id="newGameBtn">NEW GAME</button>
     <div class="ctr">A girl, a dagger, and the things that whisper in the paddies.<br>
-    WASD / Arrow keys move · SHIFT sprint · LMB strike · SPACE dodge · E talk<br>1–4 blessings · H heal · C incense · X rice offering · G charm · Drag / Q·R rotate camera · Wheel zoom · V curse-vision · M full map</div>
+    WASD / Arrow keys move · SHIFT sprint · LMB strike (hold = heavy) · SPACE dodge · E talk<br>1–4 blessings · H heal · C incense · X rice offering · G charm · Drag / Q·R rotate camera · Wheel zoom · V curse-vision · M full map</div>
   </div>
   <div id="cutscene">
     <img id="cutImg" alt="">
@@ -2200,6 +2200,9 @@ const P_player = {
   lv: 1, xp: 0, xpNext: 40, gold: 0,
   weapon: "dagger", weapons: ["dagger"], relics: [], upTier: { dmg: 0, hp: 0, san: 0 }, upDmg: 0,
   emberBlade: false,
+  /* combat depth: hold a strike to follow through into the finisher;
+     a dodge that eats a foe's blow grants a riposte window */
+  heavyStrike: false, riposteT: 0, riposteCd: 0,
   /* blessings (magic) — unlocked by story; each: { cd, veilT } style timers live here */
   spells: {}, spellCd: { moonstep: 0, ghostfire: 0, neakcoil: 0, apsara: 0 },
   veilT: 0, danceT: 0, sightT: 0, charmT: 0, pacifyPulse: 0,
@@ -2302,9 +2305,27 @@ function updateBopha(dt) {
     /* lunge forward */
     const lungeSpd = [2.6, 2.2, 4.2][p.atkIdx];
     if (p.atkT < strikeAt + 0.05) a.root.position.addScaledVector(_fwd(p.yaw), dt * lungeSpd);
-    if (!p.strikeDone[p.atkIdx] && p.atkT >= strikeAt) {
+    /* follow-through: HOLD the strike past its mark and Bopha pours
+       the swing into the finisher — a wide, heavy finisher hit */
+    const atkHeld = W3.mouse.down || !!k.j;
+    const canSegue = p.atkIdx < 2 && atkHeld;
+    const chargeT = p.atkT >= strikeAt && canSegue && !p.strikeDone[p.atkIdx];
+    if (chargeT && Math.random() < .5)
+      Particles.burst(a.root.position.x + _fwd(p.yaw).x * .8, 1.05, a.root.position.z + _fwd(p.yaw).z * .8, 1,
+        { color: [0xffd76b, 0xffa040], spdMin: 0, spdMax: .3, sMax: .04, lifeMax: .3, grav: -1 });
+    if (!p.strikeDone[p.atkIdx] && p.atkT >= strikeAt + (chargeT ? .22 : 0)) {
       p.strikeDone[p.atkIdx] = true;
-      combatStrike(p.atkIdx);
+      if (canSegue) {
+        p.heavyStrike = true;
+        p.atkIdx = 2; p.atkT = 0; p.chainQueued = false; p.chainWindow = false;
+        p.strikeDone = [true, true, false];
+        a.player.play("atk3", { restart: true, fade: .08 });
+        SFX.swish(.75);
+        Particles.burst(a.root.position.x + _fwd(p.yaw).x * .9, 1, a.root.position.z + _fwd(p.yaw).z * .9, 8,
+          { color: [0xffd76b, 0x70e8ff], spdMin: .3, spdMax: 1.2, sMax: .05, lifeMax: .5, grav: -2 });
+      } else {
+        combatStrike(p.atkIdx);
+      }
     }
     if (p.atkT >= strikeAt && p.atkT < clip.dur) p.chainWindow = true;
     if (p.chainWindow && atkPress) { p.chainQueued = true; }
@@ -2447,7 +2468,22 @@ function _fwd(yaw) { return new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw)); 
 /* public helper: damage the player */
 function hurtPlayer(amount, fromPos) {
   const p = P_player, a = p.actor;
-  if (p.dead || p.iframes > 0 || W3.state !== "play") return;
+  if (p.dead || W3.state !== "play") return;
+  if (p.iframes > 0) {
+    /* perfect dodge: a blow eats only mist — and the night owes you a riposte */
+    if (p.mode === "dodge" && p.riposteCd <= 0) {
+      p.riposteCd = 6; p.riposteT = 3.5;
+      W3.hitstop = Math.max(W3.hitstop, 0.26);
+      SFX.bell(); SFX.swish(1.1);
+      camShake(.1);
+      addMomentaryFlash(.1);
+      Particles.burst(a.root.position.x, 1, a.root.position.z, 18,
+        { color: [0x70e8ff, 0xd8e6ff, 0xffd76b], spdMin: .6, spdMax: 2.2, sMax: .07, lifeMax: .7, grav: -1.5 });
+      hudDamage(worldToScreen(a.root.position.x, 1.9, a.root.position.z), "MISS", "crit");
+      hudQuote("The blow passes through mist. The dagger drinks deep — strike, NOW.", "PERFECT DODGE — RIPOSTE");
+    }
+    return;
+  }
   /* Tevy's luck-knot: the half that works cuts the damage in two,
      and keeps the whispers out of your sleep */
   if (p.charmT > 0) amount = Math.max(1, Math.ceil(amount * .5));
@@ -7114,6 +7150,9 @@ const Foes = {
 /* ---------- per-kind tuning (single source of truth) ---------- */
 const FOE_KINDS = {
   wraith:  { hp: 34,  speed: 2.5,  dmg: 9,  reach: 1.7,  hitR: 1.9, atkCd: 1.15, tele: .42, strike: .30, lunge: 9,   fly: true,  san: 2.5, drop: [.75, 3, 9] },
+  /* hexer — the court's ember-crowned recruiter; joins the endless
+     night from wave 6 and hunts noticeably harder than a shade */
+  hexer:   { hp: 92,  speed: 2.95, dmg: 13, reach: 1.8,  hitR: 2.0, atkCd: 1.0,  tele: .38, strike: .28, lunge: 10.5, fly: true,  san: 3.2, drop: [1, 12, 22], elite: true },
   drowned: { hp: 60,  speed: 1.65, dmg: 14, reach: 1.55, hitR: 1.9, atkCd: 1.6,  tele: .50, strike: .38, lunge: 6.5, fly: false, san: 2.5, drop: [.75, 5, 12] },
   krasue:  { hp: 24,  speed: 3.1,  dmg: 7,  reach: 0,    hitR: 1.7, atkCd: 2.9,  tele: .50, strike: 0,   lunge: 0,   fly: true,  san: 1.8, drop: [.6, 3, 7], ranged: true },
   naga:    { hp: 85,  speed: 1.15, dmg: 16, reach: 2.6,  hitR: 2.0, atkCd: 1.9,  tele: .55, strike: .42, lunge: 8,   fly: false, san: 3,   drop: [1, 10, 18] },
@@ -7157,6 +7196,30 @@ function buildWraith(faceCol = 0x9fb4a8) {
   g.add(hood, face, eyeL, eyeR, shroud, shroud2, armL, armR);
   g.traverse(o => { if (o.isMesh) { o.castShadow = false; } });
   return { root: g, eyeMat, eyeL, eyeR, mats: [bodyMat] };
+}
+
+/* ---------- hexer: an ember-crowned wraith elite ----------
+   The court's recruiters wear what the queens discard — a burnt
+   hood, gold spires, and eyes like forge-coals. Faster than the
+   shades, and worth honest coin. */
+function buildHexer() {
+  const m = buildWraith(0xffd0a0);
+  m.root.scale.setScalar(1.28);
+  m.mats[0].color.setHex(0x54222a);
+  m.eyeMat.color.setHex(0xff6a30);
+  const goldM = new THREE.MeshToonMaterial({ color: 0xd6a94a, gradientMap: GRAD });
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * TAU;
+    const sp = new THREE.Mesh(coneGeo(.045, .2 + (i % 2) * .07, 0xd6a94a, 6), goldM);
+    sp.position.set(Math.sin(a) * .2, 1.62, Math.cos(a) * .2);
+    m.root.add(sp);
+  }
+  const ember = new THREE.Mesh(sphGeo(.09, 0xff6a30, 8),
+    new THREE.MeshBasicMaterial({ color: 0xff6a30, transparent: true, opacity: .8 }));
+  ember.position.y = 1.42; ember.scale.set(1.4, 1, 1.4);
+  m.root.add(ember);
+  m.root.traverse(o => { if (o.isMesh) o.castShadow = false; });
+  return m;
 }
 
 /* ---------- krasue model: flying head witch ---------- */
@@ -7594,6 +7657,7 @@ function spawnFoe(kind, x, z, hpScale = 1) {
   else if (kind === "queen") m = buildKrasueQueen();
   else if (kind === "priestess") m = buildPriestess();
   else if (kind === "krasue") m = buildKrasue();
+  else if (kind === "hexer") m = buildHexer();
   else if (kind === "naga") m = buildNaga();
   else if (kind === "krongpali") m = buildKrongPali();
   else if (kind === "vossandei") m = buildKruVossandei();
@@ -7620,6 +7684,7 @@ function spawnFoe(kind, x, z, hpScale = 1) {
     Foes.seen[kind] = true;
     const lore = {
       krasue: ["A Krasue — the flame-headed hunger. Cut it before it spits.", "KRASUE"],
+      hexer: ["A HEXER — an ember-crowned recruiter of the court. Faster than the shades. Worth honest coin.", "HEXER"],
       naga: ["A Neak shadow coils in the paddies. Sidestep its lunge.", "NEAK SHADOW"],
       monk: ["A Bralung monk. Broken vows, unbroken fists. Watch the slam.", "BRALUNG MONK"],
       warden: ["The Neak Ta itself leans on the gate. Stand, little blade.", "THE WARDEN"],
@@ -7659,6 +7724,9 @@ function waveComposition(n) {
   /* chapter 3: from the priestess hunt on, the court walks the waves */
   if (typeof QUEST !== "undefined" && QUEST.phase >= 7 && n % 3 === 0 && !q.includes("priestess"))
     q[q.length - 1] = "priestess";
+  /* from wave 6 on, the night sends the court's recruiters */
+  if (n >= 6 && Math.random() < .35) q.push("hexer");
+  if (n % 5 === 0 && n >= 10) q.push("hexer");   /* boss waves bring a bodyguard */
   /* chapter 2 ember hunt: every wave carries the hanging witches */
   if (typeof QUEST !== "undefined" && QUEST.phase === 4) {
     const kc = q.filter(k => k === "krasue").length;
@@ -7992,6 +8060,7 @@ function updateFoes(dt) {
 /* ---------- damage & drops ---------- */
 const FOE_FX = {
   wraith:  { hit: [0x70e8ff, 0xb8ffff, 0x3a8aa0], die: [0x70e8ff, 0xd8ffff], spectral: true },
+  hexer:   { hit: [0xff6a30, 0xffd76b, 0x54222a], die: [0xff6a30, 0xffd76b, 0x54222a], spectral: true },
   drowned: { hit: [0x8e1622, 0xc8202f, 0x4d5c48], die: [0x8e1622, 0x5f0e18, 0x3d0a12], spectral: false },
   krasue:  { hit: [0xffa040, 0xff6a30, 0x8e1622], die: [0xffa040, 0xffd76b, 0x8e1622], spectral: true },
   naga:    { hit: [0x3ad8b0, 0x1d6a58, 0x0f3830], die: [0x3ad8b0, 0x70e8ff, 0x0f3830], spectral: false },
@@ -8007,7 +8076,7 @@ const FOE_FX = {
 const BLOOD = {
   on: localStorage.getItem("woas_blood") !== "off",
   pools: [], vigT: 0, vigEl: null,
-  fleshy(kind) { return kind !== "wraith" && kind !== "whisperer"; },
+  fleshy(kind) { return kind !== "wraith" && kind !== "whisperer" && kind !== "hexer"; },
   spurt(x, y, z, big) {
     Particles.burst(x, y, z, big ? 24 : 11,
       { color: [0x8e1622, 0x5c0e18, 0xb51f35], spdMin: big ? 1.1 : .7, spdMax: big ? 3.2 : 2.1,
@@ -8361,6 +8430,17 @@ function updateMagic(dt) {
   }
   if (p.charmT > 0) p.charmT -= dt;
   if (p.sightT > 0) p.sightT -= dt;
+  /* riposte window — the dagger burns until it lands or the night forgets */
+  if (p.riposteT > 0) {
+    p.riposteT -= dt;
+    if (Math.random() < .5) {
+      const tip = new THREE.Vector3();
+      a.dagger.getWorldPosition(tip);
+      Particles.burst(tip.x, tip.y, tip.z, 1,
+        { color: [0xffd76b, 0xffa040], spdMin: 0, spdMax: .4, sMax: .04, lifeMax: .35, grav: .2 });
+    }
+  }
+  if (p.riposteCd > 0) p.riposteCd -= dt;
   if (p.danceT > 0) {
     p.danceT -= dt;
     p.danceTick = (p.danceTick || 0) - dt;
@@ -8464,23 +8544,46 @@ function combatStrike(atkIdx) {
   const pos = a.root.position;
   const fwd = _fwd(P_player.yaw);
   const w = (typeof WEAPONS !== "undefined" && WEAPONS[P_player.weapon]) || { base: [10, 12, 18], crit: .45, arc: 1.15 };
+  const heavy = !!P_player.heavyStrike;            /* follow-through finisher */
+  P_player.heavyStrike = false;
   const range = atkIdx === 2 ? 2.55 : 2.15;
-  const halfCos = Math.cos(w.arc);                      /* weapon arc half-angle */
+  const halfCos = Math.cos(w.arc) * (heavy ? .82 : 1);  /* weapon arc half-angle; heavy swings wider */
   const scale = 1 + (P_player.upDmg || 0) * .15;        /* forge honing */
-  const baseDmg = Math.round(w.base[atkIdx] * scale) + (P_player.emberBlade ? 4 : 0);
+  let baseDmg = Math.round(w.base[atkIdx] * scale) + (P_player.emberBlade ? 4 : 0);
+  if (heavy) baseDmg = Math.round(baseDmg * 1.65) + 6;
   let hitAny = false, lastHit = null;
 
   for (const f of Foes.list) {
     if (f.dead) continue;
     const to = new THREE.Vector3().subVectors(f.root.position, pos); to.y = 0;
     const d = to.length();
-    if (d > range + .45) continue;
+    if (d > range + (heavy ? .85 : .45)) continue;
     to.normalize();
     if (to.dot(fwd) < halfCos) continue;
     hitAny = true; lastHit = f.root.position;
     let dmg = baseDmg + Math.floor(rand(0, 4));
     if (atkIdx === 2 && Math.random() < w.crit) { dmg = Math.floor(dmg * 1.7); }
+    /* the riposte window: the night gave you the opening — take it */
+    if (P_player.riposteT > 0) dmg = Math.floor(dmg * 1.7);
     damageFoe(f, dmg, to);
+    if (heavy && !f.dead) { f.state = "stagger"; f.t = 0; f.root.position.addScaledVector(to, .55); }
+  }
+  if (heavy) {
+    camShake(.22);
+    addMomentaryFlash(.2);
+    for (let i = 0; i < 22; i++) {
+      const an = (i / 22) * TAU;
+      Particles.burst(pos.x + Math.sin(an) * rand(.6, 2), .15, pos.z + Math.cos(an) * rand(.6, 2), 2,
+        { color: [0x8a7a5c, 0xffd76b, 0x9fb4c4], spdMin: .8, spdMax: 2.6, sMax: .07, lifeMax: .5, grav: -5 });
+    }
+    SFX.swish(1.4);
+  }
+  if (P_player.riposteT > 0) {
+    P_player.riposteT = 0;
+    if (hitAny) {
+      addMomentaryFlash(.16);
+      hudQuote("The riposte lands — the opening was yours and you took it.", "RIPOSTE");
+    }
   }
   if (!hitAny) SFX.whiff();
   else {
@@ -9052,6 +9155,705 @@ Object.assign(STORY.lines["Tevy"], {
   18: ["The dawn knot! I tied one the night the queen fell, remember? Look at it now. Look at it. TIED ITSELF."]
 });
 
+/* ============================================================
+   KHMER DIALOGUE — ភាសាខ្មែរសម្រាប់ការនិយាយ
+   The interface was bilingual from the start; these tables bring
+   the spoken story itself to Khmer. Keys are "speaker␁line" for
+   character lines and "*line" for narrator/system quotes — DL()
+   falls back to English for anything not yet translated, so the
+   story never breaks. Voice keys stay hashed from the ENGLISH
+   lines, so the recorded human voices keep playing under the
+   Khmer text (documented in the README).
+   ============================================================ */
+const KM_DL = {
+  /* --- chapter beats: Chantria, phase 0 --- */
+  "Chantria\u0001You carry the old dagger. Good. The nights have grown teeth.":
+    "អ្នកនាំដាវចាស់នោះមក។ ល្អ។ យប់ឥឡូវនេះមានធ្មៃចង្កូតហើយ។",
+  "Chantria\u0001The ward-stones hum. Nothing dead can cross these walls — but the fields beyond are drowning in the restless dead.":
+    "ថ្មថែទាំកំពុងបន្លឺ។ អ្វីដែលស្លាប់ហើយមិនអាចឆ្លងជញ្ជាំងទាំងនេះបានទេ — ប៉ុន្តែស្រែខាងក្រៅលង់សុបដោយខ្មោចដែលមិនសុខ។",
+  "Chantria\u0001Cross the south gate. Scatter six wraiths, and the Neak Ta will grant you its whisper.":
+    "ឆ្លងកាត់ទ្វារខាងត្បូង។ បែកខ្ញែកខ្មោចព្រៃ ៦ ហើយអ្នកតាណាគនឹងប្រទានសំឡេងរបស់ខ្លួនដល់អ្នក។",
+  /* --- Chantria, phase 2 --- */
+  "Chantria\u0001Six shadows... the reeds are quieter already.":
+    "ស្រមោលបួនធំ... ចម្រោកក៏ស្ងាត់ចុះហើយ។",
+  "Chantria\u0001The Neak Ta moved when you struck — I felt the stones lean toward you.":
+    "អ្នកតាណាគផ្លាស់ទីពេលអ្នកប្រហារ — ខ្ញុំជ្រាបថ្មទាំងនោះទ្រេតមករកអ្នក។",
+  "Chantria\u0001The wall holds tonight because of you, little blade.":
+    "ជញ្ជាំងនេះឈ្មង់យប់នេះដោយសារអ្នកហើយ, ដាវតូច។",
+  /* --- Smith Veasna, phases 3-5 --- */
+  "Smith Veasna\u0001Sokha sent word. So you know whose hands took the song.":
+    "គ្រូ សុខា ផ្ញើសេចក្ដីមក។ ដូច្នេះអ្នកក៏ដឹងដែរថាដៃអ្នកណាយកចម្រៀងនោះទៅ។",
+  "Smith Veasna\u0001My forge is cold because haunted steel needs a spark that only burns angry.":
+    "ចង្ក្រានរបស់ខ្ញុំត្រជាក់ ព្រោះដែកដែលមានខ្មោចត្រូវការស្នាមភ្លើងដែលឆេះដោយកំពាំងបន្ទះ។",
+  "Smith Veasna\u0001A krasue carries its life in a burning ember. Cut one down and it falls hissing into the water.":
+    "ក្រសុស្យាជីវិតរបស់វានៅក្នុងធ្យូងដែលឆេះ។ ប្រហារវាម្ដង វានឹងធ្លាក់ស៊ីជ្រក់ចូលទឹក។",
+  "Smith Veasna\u0001Bring me three krasue embers, and I will fold them into your mother's dagger.":
+    "យកធ្យូងក្រសុ ៣ មកឱ្យខ្ញុំ ហើយខ្ញុំនឹងបត់វាចូលទៅក្នុងដាវម្ដាយអ្នក។",
+  "Smith Veasna\u0001Embers: ${QUEST.embers} of ${QUEST.embersNeeded}. The hanging witches carry their lives in fire — cut them down, catch the spark.":
+    "ធ្យូង៖ ${QUEST.embers} ក្នុង ${QUEST.embersNeeded}។ មេម៉ាយព្យួរនោះស្យាជីវិតក្នុងភ្លើង — ប្រហារវាចុះ ចាប់ស្នាមភ្លើងនោះ។",
+  "Smith Veasna\u0001Mind their spit. It burns worse than my forge ever did.":
+    "ប្រយ័ត្នទឹកមាត់វា។ វាឆេះអាក្រក់ជាងចង្ក្រានរបស់ខ្ញុំទៅទៀត។",
+  "Smith Veasna\u0001Hot, hot — hold the blade steady... there.":
+    "ក្ដៅហើយ ក្ដៅ — កាន់ដាវឱ្យនឹង... រួចរាល់។",
+  "Smith Veasna\u0001The ember drinks into the steel. Your mother's dagger remembers fire now.":
+    "ធ្យូងលេបចូលទៅក្នុងដែកហើយ។ ដាវម្ដាយអ្នកចងចាំភ្លើងឥឡូវនេះ។",
+  "Smith Veasna\u0001Strike true, Bopha. What waits under paddy five whispers your name.":
+    "ប្រហារឱ្យត្រង់ បុប្ផា។ អ្វីដែលរង់ចាំក្រោមស្រែលើកទី ៥ កំពុងនិយាយឈ្មោះអ្នក។",
+  /* --- Kru Sokha, phases 6-9 --- */
+  "Kru Sokha\u0001You reek of ember-steel. Good — you'll need it. The krasues have stopped hunting alone.":
+    "អ្នកស្រុះក្លិនដែកធ្យូង។ ល្អ — អ្នកនឹងត្រូវការវា។ ក្រសុទាំងនោះឈប់តាមរកម្នាក់ៗឯងហើយ។",
+  "Kru Sokha\u0001They carry tributes to the Hanging Tree, east past the dead paddies. Something there ANSWERS them.":
+    "វានាំសំណើរទៅដល់ដើមព្យួរខ្មោច ខាងកើតផុតស្រែស្លាប់។ អ្វីម្យ៉ាងនៅទីនោះឆ្លើយតបទៅវា។",
+  "Kru Sokha\u0001A queen. Gold-crowned, candle-eyed. She holds the third verse of the ward-song in her gullet — that's why the stones falter at dusk.":
+    "ម្ចាស់ក្សត្រីមួយ។ មកុដមាស ភ្នែកធូប។ នាងចង្កោះកំណាព្យទី ៣ នៃបទចម្រៀងថែទាំក្នុងក — នោះហើយជាមូលហេតុថ្មភ្នែកញ៉ាំងពេលព្រលប់។",
+  "Kru Sokha\u0001Her priestesses gather at the tree tonight. Cut down three, and bring me their hearts. I know a rite that pulls a name out of a krasue's heart.":
+    "ព្រះសង្ឃរួសរបស់នាងកករនៅដើមនោះយប់នេះ។ ប្រហារ ៣ ហើយយកបេះដូងវាមកឱ្យខ្ញុំ។ ខ្ញុំស្គាល់ពិធីមួយដែលអូសឈ្មោះចេញពីបេះដូងក្រសុ។",
+  "Kru Sokha\u0001Three hearts, ${QUEST.priests} of ${QUEST.priestsNeeded} gathered. The court priestesses wear candle-crowns — blow out the candles, then the head.":
+    "បេះដូង ៣ — ${QUEST.priests} ក្នុង ${QUEST.priestsNeeded} ហើយ។ ព្រះសង្ឃរួក្រុមពាក់មកុដធូប — បំផ្លាញធូបសិន រួចប្រហារក្បាល។",
+  "Kru Sokha\u0001They spit in volleys. Step sideways, not back — the fan spreads wider behind you.":
+    "វាបាញ់ទឹកមាត់ជាជំរូង។ ចុះចាន់ខាង — កុំថយក្រោយ — ផ្លែវាបែកធំជាងនៅខ្នងអ្នក។",
+  "Kru Sokha\u0001Set them here. Still warm. Good.":
+    "ដាក់វានៅទីនេះ។ នៅក្ដៅដដែល។ ល្អ។",
+  "Kru Sokha\u0001...the rite is ugly, but hearts don't mind. Listen: 'Vossandei... Vossandei... we only borrowed his face...'":
+    "...ពិធីនេះអាក្រក់ តែបេះដូងមិនស្អប់ទេ។ ស្ដាប់៖ «វ៉ូសាន់ដេយ... វ៉ូសាន់ដេយ... យើងត្រឹមតែខ្ចីមុខគាត់ប៉ុណ្ណោះ...»",
+  "Kru Sokha\u0001The queen keeps the third verse coiled under her tongue, and the court holds its audience at the Hanging Tree. NOW, while the candles are lit for her.":
+    "ម្ចាស់ក្សត្រីរក្សាកំណាព្យទី ៣ ក្រឡប់ក្រោមភ្លុកនាង ហើយក្រុមទាំងនោះកំពុងធ្វើសវនាការនៅដើមព្យួរខ្មោច។ ឥឡូវនេះហើយ ពេលធូបនៅដល់សម្រាប់នាង។",
+  "Kru Sokha\u0001End her audience, Bopha. Take the verse back.":
+    "បញ្ចប់សវនាការនាងចុះ បុប្ផា។ យកកំណាព្យនោះមកវិញ។",
+  "Kru Sokha\u0001The Queen's audience is being held RIGHT NOW — at the Hanging Tree, east.":
+    "សវនាការម្ចាស់ក្សត្រីកំពុងធ្វើនៅ ឥឡូវនេះហើយ — នៅដើមព្យួរខ្មោច ខាងកើត។",
+  "Kru Sokha\u0001She dive-bombs when she drifts close. Keep sideways. Keep striking.":
+    "នាងធ្លាក់ចុះដូចគ្រាប់បែបពេលនាងហៅជិត។ ចុះចាន់ជានិច្ច។ ប្រហារជានិច្ច។",
+  /* --- Chantria, phases 10-11 --- */
+  "Chantria\u0001You're pale as drum-skin. What is that silk humming...":
+    "អ្នកសឡាក់ដូចស្បែកស្គរ។ សូត្រនោះកំពុងបន្លឺអ្វី...",
+  "Chantria\u0001The third verse. She kept it UNDER HER TONGUE all this time.":
+    "កំណាព្យទី ៣។ នាងរក្សាវាក្រោមភ្លុកនាងមកដល់សព្វថ្ងៃ។",
+  "Chantria\u0001Stand inside the circle, little blade. This dance needs both our hands.":
+    "ឈ្ងោកក្នុងរង្វង់ចុះ ដាវតូច។ របាំនេះត្រូវការដៃទាំងពីរនៃយើង។",
+  "Chantria\u0001...there. The stones drink it like rain after drought. The wall stands double-thick tonight.":
+    "...រួចហើយ។ ថ្មទាំងនោះផឹកវាដូចភ្លៀងក្រោយរដូវប្រាំង។ ជញ្ជាំងក្រាស់ពីរដងយប់នេះ។",
+  "Chantria\u0001Chapter three is yours. But the humming hasn't stopped — it moved. Under paddy five. The sunken temple is singing YOUR name now.":
+    "ជំពូកទី ៣ ជារបស់អ្នកហើយ។ តែសំឡេងបន្លឺនោះមិនទាន់ស្ងាត់ — វាផ្លាស់ទីហើយ។ ក្រោមស្រែលើកទី ៥។ ប្រាសាទលង់ទឹកកំពុងច្រៀង ឈ្មោះអ្នក ឥឡូវនេះ។",
+  "Chantria\u0001The wall stands double-thick — and still the stones whisper toward the northeast. Toward paddy five.":
+    "ជញ្ជាំងក្រាស់ពីរដង — តែថ្មទាំងនោះនៅតែក្រាបទៅខាងជើងកើត។ ទៅក្រោមស្រែលើកទី ៥។",
+  "Chantria\u0001The sunken temple is singing YOUR name, little blade. It wants the dagger — the dagger that remembers your mother's hands.":
+    "ប្រាសាទលង់ទឹកកំពុងច្រៀង ឈ្មោះអ្នក ដាវតូច។ វាចង់បានដាវនោះ — ដាវដែលចងចាំដៃម្ដាយអ្នក។",
+  "Chantria\u0001Take the causeway east of the Hanging Tree, past the flooded gallery, up the west ramp. Light the three nāga braziers on the terrace — a temple cannot hide from its own fire.":
+    "យកផ្លូវថ្មខាងកើតនៃដើមព្យួរខ្មោច ផុតផែនទឹក ឡើងជណ្ដើរខាងលិច។ អុំគ្រែភ្លើងនាគ ៣ នៅផ្ទាល់មាត់ដំបូល — ប្រាសាទមិនអាចលាក់ពីភ្លើងរបស់ខ្លួនបានទេ។",
+  "Chantria\u0001The dead inside were good people once. Feed them rice if you must. And come back — I have not taught you everything I know.":
+    "អ្នកស្លាប់ក្នុងនោះធ្លាប់ជាមនុស្សល្អ។ បំបៅស្រូវឱ្យវាបើចាំបាច់។ ហើយត្រឡប់មកវិញ — ខ្ញុំនៅមិនបានបង្រៀនអ្វីៗទាំងអស់ដែលខ្ញុំដឹងទេ។",
+  /* --- Sovanna Maccha, phases 13-14 --- */
+  "Sovanna Maccha\u0001You lit the braziers. My queen — the nāga herself — bows her drowned head to you, dagger-bearer.":
+    "អ្នកអុំគ្រែភ្លើងរួចហើយ។ ម្ចាស់ក្សត្រីរបស់ខ្ញុំ — នាងនាគផ្ទាល់ — ធ្មៃក្បាលលង់ទឹករបស់នាងដល់អ្នក, អ្នកកាន់ដាវ។",
+  "Sovanna Maccha\u0001I am Sovanna Maccha, the lesser golden mermaid. I swim for the nāga queen, and I carried messages between her and your mother, once.":
+    "ខ្ញុំគឺ សុវណ្ណមច្ឆា, ស្រីទឹកមាសតូច។ ខ្ញុំហែលសម្រាប់ម្ចាស់ក្សត្រីនាគ ហើយខ្ញុំធ្លាប់នាំសាររវាងនាងនិងម្ដាយអ្នកម្ដង។",
+  "Sovanna Maccha\u0001Vossandei did not take the song alone. The temple opened FOR him — a door was held. Watch the door, not just the man.":
+    "វ៉ូសាន់ដេយមិនយកចម្រៀងតែម្នាក់ឯងទេ។ ប្រាសាទបានបើក សម្រាប់គាត់ — មានអ្នកចាំទ្វារ។ ឃ្លាំមើលទ្វារ កុំឃ្លាំមើលតែបុរស។",
+  "Sovanna Maccha\u0001His giant guards the gate gallery — Krong Pali, who marched one war too far. He was kind, they say. Be swift, and be merciful.":
+    "យក្សរបស់គាត់ភ្ញាក់ផ្សាយ៉ោងទ្វារ — ក្រុងបាលី, ដែលដើរសង្គ្រាមឆ្ងាយពេក។ គាត់ធ្លាប់មានចិត្តល្អ គេនិយាយដូច្នេះ។ ស៊ាំចុះ ហើយមានមេត្តាចុះ។",
+  "Sovanna Maccha\u0001And take my gift: the coil. My mothers' way of holding what they love — even the dead can be held still.":
+    "ហើយទទួលអំណោយរបស់ខ្ញុំ៖ ការក្រឡប់។ វិធីនៃមាតារបស់ខ្ញុំក្នុងការកាន់អ្វីដែលពួកគេស្រឡាញ់ — ទាំងអ្នកស្លាប់ក៏អាចកាន់ឱ្យនឹងបានដែរ។",
+  "Sovanna Maccha\u0001The giant of the gate gallery is marching. He salutes no one now — not even the moon.":
+    "យក្សនៃយោងទ្វារកំពុងដើរ។ គាត់សំពះគ្មាននរណាឥឡូវនេះ — ទាំងព្រះចន្ទផង។",
+  "Sovanna Maccha\u0001When he winds up his slam, coil him. Even mountains can be held.":
+    "ពេលគាត់ត្រវិងដៃដើម្បីបុក ក្រឡប់គាត់ចុះ។ ទាំងភ្នំក៏អាចកាន់ឱ្យនឹងបានដែរ។",
+  /* --- Chantria, phase 17 (finale) --- */
+  "Chantria\u0001You're humming. Do you know you're humming? THE SONG. All of it. Every verse.":
+    "អ្នកកំពុងបន្លឺម៉ូត។ អ្នកដឹងទេថាអ្នកកំពុងបន្លឺម៉ូត? បទចម្រៀងនោះ។ ទាំងអស់។ កំណាព្យទាំងប៉ុន្មាន។",
+  "Chantria\u0001Then stand in the circle, little blade. My hands and yours — the wall gets the song back tonight.":
+    "ចាំនៅក្នុងរង្វង់ចុះ ដាវតូច។ ដៃខ្ញុំនិងដៃអ្នក — ជញ្ជាំងនឹងបានបទចម្រៀងត្រឡប់មកវិញយប់នេះ។",
+  "Chantria\u0001...oh. Oh, of course. The ward-song was never a WAR song. It's a wedding song. Preah Thong's procession to Neang Neak — the oldest marriage, the one that founded the Khmer. The nāga sang it to bind two peoples into one.":
+    "...ឱ។ ឱ, បាទ/ចាស។ បទចម្រៀងថែទាំមិនដែលជាបទសង្គ្រាមទេ។ វាជាបទចម្រៀងមង្គលការ។ ដំណើរព្រះធុងទៅកាន់នាងនាក — ការអភិវាមុខចំណាស់បំផុត, ដែលបានបង្កើតខ្មែរ។ នាងនាគច្រៀងវាដើម្បីភ្ជាប់ប្រជាជនពីរទៅជាមួយ។",
+  "Chantria\u0001That is why it holds the wall. A wall is only a village saying: we belong to each other. Sing it with me.":
+    "នោះហើយជាមូលហេតុដែលវាកាន់ជញ្ជាំង។ ជញ្ជាំងគ្រាន់តែជាសំឡេងភូមិថា៖ យើងជាកម្មសិទ្ធិរបស់គ្នាទៅវិញទៅមក។ ច្រៀងវាជាមួយខ្ញុំចុះ។",
+  "Chantria\u0001...the stones are drinking it in. The well is ringing. Bopha — look east. The sky is turning the color of morning rice.":
+    "...ថ្មទាំងនោះកំពុងផឹកវាចូល។ អណ្ដូងកំពុងរងំ។ បុប្ផា — មើលខាងកើត។ មេឃកំពុងប្ដូរទៅជាពណ៌ស្រូវព្រឹក។",
+  /* --- system/narrator quotes (no speaker) --- */
+  "*The ward-stones hum. Nothing dead can cross these walls.":
+    "ថ្មថែទាំកំពុងបន្លឺ។ អ្វីដែលស្លាប់ហើយមិនអាចឆ្លងជញ្ជាំងទាំងនេះបានទេ។",
+  "*Chantria waits by the shrine, east of the plaza.":
+    "ចាន់ត្រារង់ចាំនៅជិតទេវស្ថាន ខាងកើតនៃទីផ្សារ។",
+  "*The dead lean on the gate. Teach them what the dagger remembers.":
+    "អ្នកស្លាប់ទ្រេតលើទ្វារ។ បង្រៀនពួកវាអ្វីដែលដាវចងចាំ។",
+  "*Six shadows scattered. The Neak Ta stirs — return to Chantria.":
+    "ស្រមោលបួនធំបែកខ្ញែកហើយ។ អ្នកតាណាគផ្លាស់ទី — ត្រឡប់ទៅរកចាន់ត្រា។",
+  "*Krasues hang past the gate. Cut them down and catch their embers from the water.":
+    "ក្រសុព្យួរផុតទ្វារ។ ប្រហារវាចុះ ហើយចាប់ធ្យូងរបស់វាពីទឹក។",
+  "*The east field keens. Gold crowns descend by the Hanging Tree — the queen's choir is gathering.":
+    "ស្រែខាងកើតស្រែកក្រែល។ មកុដមានធ្លាក់ចុះនៅជិតដើមព្យួរខ្មោច — ជំរុំរបស់ម្ចាស់ក្សត្រីកំពុងកករ។",
+  "*Candles light themselves along the Hanging Tree's arms. The audience is seated. GO EAST.":
+    "ធូបដុតខ្លួនឯងតាមមាត់ដើមព្យួរខ្មោច។ សវនាការបានអង្គុយ។ ទៅខាងកើត។",
+  "*The gate gallery thuds like a slow drum. KRONG PALI is marching.":
+    "យោងទ្វារបន្លឺដូចស្គររីម៉ាំង។ ក្រុងបាលីកំពុងដើរ។",
+  "*The causeway east of the Hanging Tree leads to the drowned gallery. Go northeast — light the three nāga braziers on the temple terrace.":
+    "ផ្លូវថ្មខាងកើតនៃដើមព្យួរខ្មោចទៅដល់ផែនទឹកលង់។ ទៅខាងជើងកើត — អុំគ្រែភ្លើងនាគ ៣ នៅផ្ទាល់មាត់ដំបូលប្រាសាទ។"
+};
+
+/* short labels that appear as the quote's em-dash source tag */
+const KM_SRC = {
+  "E — continue": "E — បន្ត",
+  "THE DROWNED RICE FIELDS": "ស្រែចម្រោកលង់ទឹក",
+  "FIND THE MOON-WARD DANCER": "ស្វែងរកអ្នករបាំចាន់ព្រះចន្ទ",
+  "SLAY THE WRAITHS": "ប្រហារខ្មោចព្រៃ",
+  "THE WARD STIRS": "ថែទាំផ្លាស់ទី",
+  "NEAK TA — CHAPTER 1 CLEARED": "អ្នកតាណាគ — ជំពូកទី ១ រួចរាល់",
+  "CHAPTER 2 — THE SILENT FORGE": "ជំពូកទី ២ — ចង្ក្រានស្ងាត់",
+  "CHAPTER 2 CLEARED — THE EMBER BLADE": "ជំពូកទី ២ រួចរាល់ — ដាវធ្យូង",
+  "CHAPTER 3 — THE KRASUE'S COURT": "ជំពូកទី ៣ — ក្រុមក្រសុ",
+  "CHAPTER 3 CLEARED — THE KRASUE'S COURT": "ជំពូកទី ៣ រួចរាល់ — ក្រុមក្រសុ",
+  "CHAPTER 4 — THE SUNKEN TEMPLE": "ជំពូកទី ៤ — ប្រាសាទលង់ទឹក",
+  "CHAPTER 4 CLEARED": "ជំពូកទី ៤ រួចរាល់",
+  "CHAPTER 5 — THE WHISPERER": "ជំពូកទី ៥ — សំឡេងក្រាប",
+  "CHAPTER 6 — THE WEDDING SONG": "ជំពូកទី ៦ — ចម្រៀងមង្គលការ",
+  "THE SILENT FORGE — EMBER HUNT": "ចង្ក្រានស្ងាត់ — តាមរកធ្យូង",
+  "EMBER DROPPED": "ធ្យូងធ្លាក់",
+  "THE COURT GATHERS": "ក្រុមកករ",
+  "THE HEARTS WHISPER": "បេះដូងក្រាប",
+  "COURT PRIESTESS FELLED": "ព្រះសង្ឃរួក្រុមធ្លាក់",
+  "THE QUEEN'S AUDIENCE": "សវនាការម្ចាស់ក្សត្រី",
+  "THE THIRD VERSE": "កំណាព្យទី ៣",
+  "KRONG PALI FALLS": "ក្រុងបាលីធ្លាក់",
+  "THE WHISPERER RISES": "សំឡេងក្រាបលេចឡើង",
+  "THE SONG RELEASED": "បទចម្រៀងបានដួររលុង",
+  "THE GIANT OF THE GATE": "យក្សនៃទ្វារ",
+  "THE QUEEN IS FELLED": "ម្ចាស់ក្សត្រីធ្លាក់",
+  "THE KRU FALLS": "គ្រូធ្លាក់",
+  "THE GIANT RESTS": "យក្សសម្រាក",
+  "THE WHISPERER FADES": "សំឡេងក្រាបរលត់",
+  "WARDEN FELLED": "អ្នកភ្ញាក់ផ្សាធ្លាក់",
+  "THE WARDEN — WAVE ": "អ្នកភ្ញាក់ផ្សា — ជំរុា ",
+  "WAVE ": "ជំរុា ",
+  "NIGHT ": "យប់ ",
+  "DAWN": "ព្រលឹម",
+  "WAVE  INCOMING": "ជំរុា កំពុងមកដល់",
+  "THE COURT REGATHERS": "ក្រុមកករឡើងវិញ",
+  "THE QUEEN RETURNS": "ម្ចាស់ក្សត្រីត្រឡប់មកវិញ",
+  "KRONG PALI RETURNS": "ក្រុងបាលីត្រឡប់មកវិញ",
+  "THE KRU WAITS": "គ្រូរង់ចាំ",
+  "THE WHISPERER RETURNS": "សំឡេងក្រាបត្រឡប់មកវិញ",
+  "RISE AGAIN": "ឡើងវិញម្ដងទៀត",
+  "THE HERB-WITCH'S THANKS": "អំណរគុណនៃគ្រូស្រីថ្នាំ",
+  "EMPTY POUCH": "ថង់ទំនេរ",
+  "SPIRIT TOO LOW": "វិញ្ញាណតូចពេក",
+  "NOT YET LEARNED": "មិនទាន់រៀនទេ",
+  "MOONWARD STEP": "ជំហានទៅកាន់ព្រះចន្ទ",
+  "NEAK COIL": "ការក្រឡប់នាគ",
+  "APSARA BLESSING": "ពរនៃអប្សរា",
+  "LOTUS POULTICE · +38 HP": "ថ្នាំផ្កាឈូក · +38 ជីវិត",
+  "INCENSE · CURSE-SIGHT": "ធូប · ភ្នែកឃើញព្រាយ",
+  "RICE OFFERING": "ការថ្វាយស្រូវ",
+  "LUCK-KNOT · WARD HALF-DAMAGE": "កួរសំណាង · ថែទាំបន្ថយរបួសពាក់កណ្ដាល",
+  "NEW BLESSING — ": "ពរថ្មី — ",
+  "LEVEL ": "កម្រិត ",
+  "EMPTIED": "ទំនេរហើយ",
+  "WEAPON CHANGED": "ប្ដូរអាវុធ",
+  "THE TEMPLE WAKES": "ប្រាសាទភ្ញាក់ឡើង"
+};
+const KM_SRC_PRE = ["THE WARDEN — WAVE ", "WAVE ", "NIGHT ", "NEW BLESSING — ", "LEVEL ", "CHAPTER ", "THE WARDEN — WAVE"];
+
+/* verbs for the interact tip */
+const VERB_KM = {
+  "Talk to": "និយាយជាមួយ", "Search": "ស្វែងរក", "Climb": "ឡើង", "Take": "យក",
+  "Offer": "ថ្វាយ", "Pray": "សំពះ", "Light": "ដុត", "Open": "បើក", "Read": "អាន", "Dig": "ជីក"
+};
+
+/* quest panel, cutscenes, first-sighting lore — exact global table */
+Object.assign(KM_DL, {
+  /* quest panel */
+  "*Speak with Chantria at the shrine, east of the plaza.": "និយាយជាមួយចាន់ត្រានៅទេវស្ថាន ខាងកើតនៃទីផ្សារ។",
+  "*Find the shrine of Neak Ta beyond the fields.": "ស្វែងរកទេវស្ថានអ្នកតាណាគផុតស្រែ។",
+  "*Return to Chantria at the shrine.": "ត្រឡប់ទៅរកចាន់ត្រានៅទេវស្ថាន។",
+  "*Reach the drowned rice fields.": "ទៅដល់ស្រែចម្រោកលង់ទឹក។",
+  "*Endless night — the herb-witch knows what was stolen.": "យប់គ្មានទីបញ្ចប់ — គ្រូថ្នាំស្គាល់អ្វីដែលបានលួច។",
+  "*Chapter 1 cleared. Talk to Smith Veasna at the forge, north of the plaza.": "ជំពូកទី ១ រួចរាល់។ និយាយជាមួយអ្នកជាង វ៉ាសនានៅចង្ក្រាន ខាងជើងនៃទីផ្សារ។",
+  "*Carry the embers to Smith Veasna at the forge.": "យកធ្យូងទៅឱ្យអ្នកជាង វ៉ាសនានៅចង្ក្រាន។",
+  "*The krasues' court whispers a name — Vossandei. Kru Sokha knows the rite.": "ក្រុមក្រសុក្រាបឈ្មោះ — វ៉ូសាន់ដេយ។ គ្រូ សុខា ស្គាល់ពិធីនោះ។",
+  "*Chapter 1 cleared.": "ជំពូកទី ១ រួចរាល់។",
+  "*Chapter 2 cleared — the ember blade.": "ជំពូកទី ២ រួចរាល់ — ដាវធ្យូង។",
+  "*Chapter 3 — the court revealed itself.": "ជំពូកទី ៣ — ក្រុមបានបង្ហាញខ្លួន។",
+  "*Carry the priestess hearts to Kru Sokha at the herb hut, south-west.": "យកបេះដូងទៅឱ្យគ្រូ សុខានៅផ្ទះថ្នាំ ខាងត្បូងលិច។",
+  "*End the Krasue Queen's audience at the Hanging Tree.": "បញ្ចប់សវនាការនៃម្ចាស់ក្សត្រីក្រសុនៅដើមព្យួរខ្មោច។",
+  "*Slay the court priestesses.": "ប្រហារព្រះសង្ឃរួក្រុម។",
+  "*The hearts named the kru: Vossandei.": "បេះដូងបានប្រាប់ឈ្មោះគ្រូ៖ វ៉ូសាន់ដេយ។",
+  "*Carry the ward-song's third verse to Chantria at the shrine.": "យកកំណាព្យទី ៣ នៃបទចម្រៀងថែទាំទៅឱ្យចាន់ត្រានៅទេវស្ថាន។",
+  "*The Queen is felled — the verse recovered.": "ម្ចាស់ក្សត្រីធ្លាក់ — កំណាព្យបានត្រឡប់មកវិញ។",
+  "*Chapter 3 cleared — the verse restored.": "ជំពូកទី ៣ រួចរាល់ — កំណាព្យបានជួសជុល។",
+  "*Follow the causeway northeast, past the Hanging Tree.": "ដើរតាមផ្លូវថ្មទៅខាងជើងកើត ផុតដើមព្យួរខ្មោច។",
+  "*Climb the west ramp to the flooded temple.": "ឡើងជណ្ដើរខាងលិចទៅប្រាសាទលង់ទឹក។",
+  "*The braziers burn.": "គ្រែភ្លើងដូតហើយ។",
+  "*Speak with the golden light in the drowned gallery.": "និយាយជាមួយពន្លឺមាសក្នុងផែនទឹកលង់។",
+  "*Face Krong Pali, the giant of the gate gallery.": "ទប់ក្រុងបាលី យក្សនៃយោងទ្វារ។",
+  "*Sovanna Maccha taught you the coil.": "សុវណ្ណមច្ឆាបង្រៀនអ្នកការក្រឡប់។",
+  "*Krong Pali salutes and rests.": "ក្រុងបាលីសំពះហើយសម្រាក។",
+  "*Confront Kru Vossandei at the face tower, east end of the terrace.": "ទប់មុខគ្រូ វ៉ូសាន់ដេយនៅប៉មមុខ ចុងខាងកើតនៃផ្ទាល់មាត់ដំបូល។",
+  "*Vossandei's robes fell empty.": "អាវផោមរបស់វ៉ូសាន់ដេយធ្លាក់ទំនេរ។",
+  "*Chantria taught you the Apsara Blessing.": "ចាន់ត្រាបង្រៀនអ្នកពរអប្សរា។",
+  "*The Whisperer has risen in the flooded gallery. End it.": "សំឡេងក្រាបលេចឡើងក្នុងផែនទឹកលង់។ បញ្ចប់វាចុះ។",
+  "*The Whisperer is unspooled.": "សំឡេងក្រាបរលុងរលួសហើយ។",
+  "*The song hums whole on your tongue.": "បទចម្រៀងបន្លឺពេញលេញលើអណ្ដើកអ្នក។",
+  "*Carry the whole ward-song back to Chantria at the shrine.": "យកបទចម្រៀងថែទាំទាំងមូលត្រឡប់ទៅឱ្យចាន់ត្រានៅទេវស្ថាន។",
+  "*Chapter 4 — the temple, the giant, the kru.": "ជំពូកទី ៤ — ប្រាសាទ យក្ស និងគ្រូ។",
+  "*Chapter 5 — the Whisperer unspooled.": "ជំពូកទី ៥ — សំឡេងក្រាបរលុងរលួស។",
+  "*Chapter 6 — the Wedding Song: dawn over the drowned village.": "ជំពូកទី ៦ — ចម្រៀងមង្គលការ៖ ព្រលឹមលើភូមិលង់ទឹក។",
+  "*The wedding song is sung. Sambok Chas sleeps — and so can you.": "បទចម្រៀងមង្គលការច្រៀងរួចហើយ។ សំបុកចាស់កំពុងគេង — ហើយអ្នកក៏អាចគេងដែរ។",
+  /* cutscene texts */
+  "*Sambok Chas drowned in a single night, three seasons ago. Tonight the dead lean on the ward wall again — and her mother's dagger has chosen its keeper.":
+    "សំបុកចាស់លង់ទឹកក្នុងមួយយប់តែប៉ុណ្ណោះ បីរដូវមុននេះ។ យប់នេះអ្នកស្លាប់ទ្រេតលើជញ្ជាំងថែទាំម្ដងទៀត — ហើយដាវរបស់ម្ដាយនាងបានជ្រើសរើសអ្នកថែរក្សារបស់វា។",
+  "*The Neak Ta whispers a name through the reeds: the herb-witch knows whose hands took the song. The forge is cold, and only angry fire can wake it.":
+    "អ្នកតាណាគក្រាបឈ្មោះមួយឆ្លងចម្រោក៖ គ្រូថ្នាំស្គាល់ដៃរបស់អ្នកណាដែលយកចម្រៀងនោះ។ ចង្ក្រានត្រជាក់ហើយ ហើយតែភ្លើងកំពាំងបន្ទះប៉ុណ្ណោះអាចភ្ញាក់វា។",
+  "*The ember blade drinks its first hungers. Out past the deep mist the hanging witches have gathered a court — and their queen keeps a list of names.":
+    "ដាវធ្យូងលេបការឃ្លានដំបូងរបស់វា។ ក្រៅពីតំបន់ព្រមល្បាច មេម៉ាយព្យួរបានកករក្រុមមួយ — ហើយម្ចាស់ក្សត្រីរបស់ពួកវារក្សាបញ្ជីឈ្មោះមួយ។",
+  "*Under paddy five, the nāga's bones keep the beat of a stolen song. Light the braziers, wake the gallery — and watch the man who held its door.":
+    "ក្រោមស្រែលើកទី ៥ ឆ្អឹងនាគរក្សាចង្វាមនៃបទចម្រៀងដែលបានលួច។ អុំគ្រែភ្លើង ភ្ញាក់ផែនទឹក — ហើយឃ្លាំមើលបុរសដែលចាំទ្វាររបស់វា។",
+  "*Vossandei's robes fall empty. The thing he called up wears the drowned nāga's stolen face — and it hums the song wrong on purpose. The bastard ends tonight.":
+    "អាវផោមរបស់វ៉ូសាន់ដេយធ្លាក់ទំនេរ។ អ្វីដែលគាត់ហៅឡើងពាក់មុខនាគលង់ទឹកដែលបានលួច — ហើយវាបន្លឺបទចម្រៀងខុសដោយចេតនា។ ជនក្រមសក្តិសំរាមនោះបញ្ចប់យប់នេះ។",
+  "*Dawn comes to Sambok Chas. The wall hums an old wedding song, the dead bow out, and the village remembers its name — Preah Thong and Neang Neak, danced whole again.":
+    "ព្រលឹមមកដល់សំបុកចាស់។ ជញ្ជាំងបន្លឺបទចម្រៀងមង្គលការចំណាស់ អ្នកស្លាប់សំពះចេញទៅ ហើយភូមិចងចាំឈ្មោះរបស់ខ្លួន — ព្រះធុងនិងនាងនាក របាំទាំងមូលម្ដងទៀត។",
+  /* first-sighting lore */
+  "*A Krasue — the flame-headed hunger. Cut it before it spits.":
+    "ក្រសុមួយ — ការឃ្លានក្បាលភ្លើង។ ប្រហារវាមុនវាបាញ់ទឹកមាត់។",
+  "*A HEXER — an ember-crowned recruiter of the court. Faster than the shades. Worth honest coin.":
+    "ហិចសរមួយ — អ្នកកាន់តំណាភារកិច្ចពាក់មកុដធ្យូងនៃក្រុម។ លឿនជាងស្រមោល។ សក្តិសមនឹងកាក់ពិត។",
+  "*The blow passes through mist. The dagger drinks deep — strike, NOW.":
+    "ការវាយឆ្លងកាត់ព្រមល្បាច។ ដាវលេបចូលខ្លាំង — ប្រហារ ឥឡូវនេះ។",
+  "*The riposte lands — the opening was yours and you took it.":
+    "ការវាយតបទៅដល់ — ឱកាសនោះជារបស់អ្នក ហើយអ្នកបានយកវា។",
+  "*A Neak shadow coils in the paddies. Sidestep its lunge.":
+    "ស្រមោលនាគក្រឡប់ក្នុងស្រែ។ ចុះចាន់ឱ្យឆ្ងាយពីការហោះរបស់វា។",
+  "*A Bralung monk. Broken vows, unbroken fists. Watch the slam.":
+    "ព្រះសង្ឃប្រលឹង។ សីលធម៌ខូច ដៃខ្លាំងមិនខូច។ ប្រយ័ត្នការបុករបស់វា។",
+  "*The Neak Ta itself leans on the gate. Stand, little blade.":
+    "អ្នកតាណាគផ្ទាល់ទ្រេតលើទ្វារ។ ឈ្ងោកនៅចុះ ដាវតូច។",
+  "*A priestess of the court — gold crown, candle eyes. She spits in volleys; watch the spread.":
+    "ព្រះសង្ឃរួនៃក្រុម — មកុដមាស ភ្នែកធូប។ នាងបាញ់ទឹកមាត់ជាជំរូង ប្រយ័ត្នការបែក។",
+  "*THE KRASUE QUEEN — she wore a woman's face when the fields were green. End her audience.":
+    "ម្ចាស់ក្សត្រីក្រសុ — នាងពាក់មុខស្ត្រីពេលស្រែនៅបៃតង។ បញ្ចប់សវនាការនាងចុះ។",
+  "*KRONG PALI — the giant of the causeway. His war forgot him; he never forgot his post. Mind the slam — it is a hell of a slam.":
+    "ក្រុងបាលី — យក្សនៃផ្លូវថ្ម។ សង្គ្រាមរបស់គាត់ភ្លេចគាត់ តែគាត់មិនដែលភ្លេចកន្លែងរបស់ខ្លួន។ ប្រយ័ត្នការបុក — វាជាការបុកដែលមិនធម្មតា។",
+  "*KRU VOSSANDEI — he served this village, then served something older. The ward-song dies with his silence. The stubborn bastard still won't sing it.":
+    "គ្រូ វ៉ូសាន់ដេយ — គាត់បម្រើភូមិនេះ រួចបម្រើអ្វីម្យ៉ាងចំណាស់ជាង។ បទចម្រៀងថែទាំស្លាប់ជាមួយភាពស្ងាត់របស់គាត់។ ជនចំកាចនោះនៅតែមិនចង់ច្រៀងវា។",
+  "*THE WHISPERER — older than the temple, older than the song. It wears a drowned nāga's face. It wants the dagger — and it wants you begging for hell's mercy.":
+    "សំឡេងក្រាប — ចំណាស់ជាងប្រាសាទ ចំណាស់ជាងបទចម្រៀង។ វាពាក់មុខនាគលង់ទឹក។ វាចង់បានដាវនោះ — ហើយវាចង់ឱ្យអ្នកសុំមេត្តាពីនរក។"
+});
+Object.assign(KM_SRC, {
+  "CHAPTER 1 · THE DROWNED RICE FIELDS": "ជំពូកទី ១ · ស្រែចម្រោកលង់ទឹក",
+  "CHAPTER 2 · THE SILENT FORGE": "ជំពូកទី ២ · ចង្ក្រានស្ងាត់",
+  "CHAPTER 3 · THE KRASUE'S COURT": "ជំពូកទី ៣ · ក្រុមក្រសុ",
+  "CHAPTER 4 · THE SUNKEN TEMPLE": "ជំពូកទី ៤ · ប្រាសាទលង់ទឹក",
+  "CHAPTER 5 · THE WHISPERER": "ជំពូកទី ៥ · សំឡេងក្រាប",
+  "CHAPTER 6 · THE WEDDING SONG": "ជំពូកទី ៦ · ចម្រៀងមង្គលការ",
+  "KRASUE": "ក្រសុ", "NEAK SHADOW": "ស្រមោលនាគ", "BRALUNG MONK": "ព្រះសង្ឃប្រលឹង",
+  "HEXER": "ហិចសរ", "PERFECT DODGE — RIPOSTE": "គេចឱ្យត្រឹមត្រូវ — វាយតប", "RIPOSTE": "វាយតប",
+  "THE WARDEN": "អ្នកភ្ញាក់ផ្សា", "COURT PRIESTESS": "ព្រះសង្ឃរួក្រុម",
+  "THE KRASUE QUEEN": "ម្ចាស់ក្សត្រីក្រសុ", "KRONG PALI": "ក្រុងបាលី",
+  "THE KRU": "គ្រូ", "THE WHISPERER": "សំឡេងក្រាប",
+  "ENDLESS NIGHT · CHAPTER 2 BECKONS": "យប់គ្មានទីបញ្ចប់ · ជំពូកទី ២ កំពុងហៅ",
+  "EMBER NIGHT · CHAPTER 2": "យប់ធ្យូង · ជំពូកទី ២",
+  "EMBER NIGHT · CHAPTER 2 CLEARED": "យប់ធ្យូង · ជំពូកទី ២ រួចរាល់",
+  "KEENING WIND · CHAPTER 3": "ខ្យល់ស្រែកក្រែល · ជំពូកទី ៣",
+  "KEENING WIND · CHAPTER 3 — THE QUEEN": "ខ្យល់ស្រែកក្រែល · ជំពូកទី ៣ — ម្ចាស់ក្សត្រី",
+  "SUNKEN MOON · CHAPTER 4": "ព្រះចន្ទលង់ទឹក · ជំពូកទី ៤",
+  "SUNKEN MOON · CHAPTER 4 — THE GIANT": "ព្រះចន្ទលង់ទឹក · ជំពូកទី ៤ — យក្ស",
+  "SUNKEN MOON · CHAPTER 4 — THE KRU": "ព្រះចន្ទលង់ទឹក · ជំពូកទី ៤ — គ្រូ",
+  "THE FLOODED DARK · CHAPTER 5": "ភាពងងឹតលង់ទឹក · ជំពូកទី ៥",
+  "THE FLOODED DARK · CHAPTER 5 CLEARED": "ភាពងងឹតលង់ទឹក · ជំពូកទី ៥ រួចរាល់",
+  "CLEAR NIGHT · CHAPTER 1": "យប់ភ្លឺ · ជំពូកទី ១"
+});
+
+/* STORY.lines — the villagers' standing chatter (early game + chapter 3).
+   Untranslated lines fall back to English without breaking anything. */
+Object.assign(KM_DL, {
+  "Chantria\u0001You dance like her now. Your mother, I mean. The dagger remembers her hands.":
+    "អ្នករបាំដូចនាងហើយ។ ម្ដាយអ្នក ខ្ញុំមានន័យដូច្នេះ។ ដាវចងចាំដៃរបស់នាង។",
+  "Chantria\u0001The stones hum quieter each night. Vossandei is chewing through the ward-song.":
+    "ថ្មទាំងនោះបន្លឺស្ងាត់ជាងម្ដងមួយយប់។ វ៉ូសាន់ដេយកំពុងព្រុសបទចម្រៀងថែទាំ។",
+  "Chantria\u0001Rest while the bell holds. Chapter two begins at Veasna's forge — bring him krasue ember.":
+    "សម្រាកពេលក្រិចនៅតែកាន់។ ជំពូកទី ២ ចាប់ផ្ដើមនៅចង្ក្រានរបស់វ៉ាសនា — យកធ្យូងក្រសុទៅឱ្យគាត់។",
+  "Smith Veasna\u0001Feel the wall at night? The hum drops a note each dusk. That's the ward-song fraying.":
+    "ឃើញជញ្ជាំងយប់ទេ? សំឡេងបន្លឺធ្លាក់ចុងតន្ត្រីម្ដងមួយព្រលប់។ នោះគឺបទចម្រៀងថែទាំកំពុងរាវ។",
+  "Smith Veasna\u0001Bring me a krasue's ember and I'll fold it into your dagger. Steel remembers, girl — but ember teaches.":
+    "យកធ្យូងរបស់ក្រសុមកឱ្យខ្ញុំ ហើយខ្ញុំនឹងបត់វាចូលដាវអ្នក។ ដែកចងចាំ — តែធ្យូងជាគ្រូ។",
+  "Smith Veasna\u0001Chapter two: the Silent Forge. My anvil's been cold since the kru took the song.":
+    "ជំពូកទី ២៖ ចង្ក្រានស្ងាត់។ ផ្ទាំងដែករបស់ខ្ញុំត្រជាក់មកតាំងពីគ្រូយកបទចម្រៀង។",
+  "Smith Veasna\u0001The blade hums at dusk now. That's the ember, learning your mother's grip.":
+    "ដាវបន្លឺពេលព្រលប់ឥឡូវនេះ។ នោះគឺធ្យូង កំពុងរៀនការកាន់របស់ម្ដាយអ្នក។",
+  "Smith Veasna\u0001When you go under paddy five, come to me first. Steel that learns fire forgets water.":
+    "ពេលអ្នកចុះក្រោមស្រែលើកទី ៥ មករកខ្ញុំសិន។ ដែកដែលរៀនភ្លើងភ្លេចទឹក។",
+  "Smith Veasna\u0001The krasues' court keeps the old road to the temple. Their queen remembers being human — barely.":
+    "ក្រុមក្រសុរក្សាផ្លូវចាស់ទៅប្រាសាទ។ ម្ចាស់ក្សត្រីរបស់ពួកវាចងចាំពេលជាមនុស្ស — បន្តិចបន្តួច។",
+  "Srey\u0001Rice to the living, and now you bring talk of temples under the water.":
+    "ស្រូវសម្រាប់អ្នករស់ ហើយឥឡូវអ្នកនាំសន្ទនាអំពីប្រាសាទក្រោមទឹកមក។",
+  "Srey\u0001A kru walked our fields once — Vossandei. Sang at the shrine like a man in love. Then the nāga went quiet.":
+    "គ្រូម្នាក់ដើរលើស្រែយើងម្ដង — វ៉ូសាន់ដេយ។ ច្រៀងនៅទេវស្ថានដូចបុរសស្នេហា។ រួចនាងនាគស្ងាត់ទៅ។",
+  "Srey\u0001If you go under paddy five, take bread. The dead there were bakers, once.":
+    "បើអ្នកចុះក្រោមស្រែលើកទី ៥ យកនំបុ័ងទៅ។ អ្នកស្លាប់ទីនោះធ្លាប់ជាអ្នកបង្អែបង្អែកនំ។",
+  "Elder Chum\u0001I prayed at the drowning. I remember the water tasting of lullabies.":
+    "ខ្ញុំបន់ស្រន់ពេលការលង់ទឹក។ ខ្ញុំចងចាំទឹកដែលមានរសជាតិបទកំសត៍។",
+  "Elder Chum\u0001Vossandei sat where you stand, young blade, and asked the nāga for its song. It gave. Spirits always give — that is the tragedy.":
+    "វ៉ូសាន់ដេយអង្គុយនៅកន្លែងដែលអ្នកឈ្ងោក ដាវវ៉ៃវ៉ៃ ហើយសុំបទចម្រៀងពីនាងនាគ។ នាងឱ្យ។ វិញ្ញាណតែងតែឱ្យ — នោះគឺសោកនាដកម្ម។",
+  "Elder Chum\u0001The Whisperer was already old when I was young. Older than the temple. Older than the song.":
+    "សំឡេងក្រាបបានចាស់ហើយពេលខ្ញុំនៅក្មេង។ ចំណាស់ជាងប្រាសាទ។ ចំណាស់ជាងបទចម្រៀង។",
+  "Dara\u0001Teacher says you scattered six shadows! I counted the bell-rings!":
+    "គ្រូបង្រៀនថាអ្នកបានបែកខ្ញែកស្រមោលបួនធំ! ខ្ញុំរាប់សំឡេងក្រិច!",
+  "Dara\u0001There's a lady who walks the mist with no feet. She only whispers. Kru Sokha says never whisper back.":
+    "មានស្ត្រីម្នាក់ដើរលើព្រមល្បាចដោយគ្មានជើង។ នាងត្រឹមតែក្រាប។ គ្រូ សុខា ថាកុំក្រាបតប។",
+  "Kru Sokha\u0001Mind the mist, child — it carries other people's dreams.":
+    "ប្រយ័ត្នព្រមល្បាចចុះ កូន — វានាំសុបិនរបស់អ្នកដទៃ។",
+  "Kru Sokha\u0001You have her jaw. The dagger-bearer before you. She dried lotus on that rack, once.":
+    "អ្នកមានចង្កូមដូចនាង។ អ្នកកាន់ដាវមុនអ្នក។ នាងធ្លាប់ស្ងោរផ្កាឈូកនៅរ៉ាកនោះ។",
+  "Kru Sokha\u0001The dead aren't angry. They're homesick. There's a worse thing than anger walking the fields.":
+    "អ្នកស្លាប់មិនកំពាំងទេ។ ពួកគេខ្វះភូមិកំណើត។ មានអ្វីអាក្រក់ជាងកំពាំងដើរលើស្រែ។",
+  "Kru Sokha\u0001Six shadows for the shrine — good. While you hunt, chew this. It keeps your dreams your own.":
+    "ស្រមោលបួនធំ ៦ សម្រាប់ទេវស្ថាន — ល្អ។ ពេលអ្នកតាមរក ចង់របស់នេះចុះ។ វារក្សាសុបិនអ្នកជារបស់អ្នក។",
+  "Kru Sokha\u0001Kralanh counts the dead at the gate each dusk. Ask him which names stopped coming.":
+    "ក្រឡាន់រាប់អ្នកស្លាប់នៅទ្វារពេលព្រលប់ម្ដងៗ។ សួរគាត់ថាឈ្មោះណាបានឈប់មក។",
+  "Kru Sokha\u0001The Neak Ta spoke? Then the wall leans on you now too, whether you like it or not.":
+    "អ្នកតាណាគនិយាយ? ដូច្នេះជញ្ជាំងក៏ទ្រេតលើអ្នកឥឡូវនេះដែរ មិនថាអ្នកចូលចិត្តឬអត់។",
+  "Kru Sokha\u0001Take the gray sachet. When the whispers come in your sleep, it gives them a door that closes.":
+    "យកថង់ប្រផេះនេះទៅ។ ពេលសំឡេងក្រាបមកក្នុងសុបិនអ្នក វាផ្ដល់ទ្វារដែលបិទបានដល់ពួកវា។",
+  "Kru Sokha\u0001So the night doesn't end. Then listen, and listen once: the ward-song was STOLEN, not lost.":
+    "ដូច្នេះយប់មិនបញ្ចប់។ ចាំស្ដាប់ ស្ដាប់ម្ដងតែប៉ុណ្ណោះ៖ បទចម្រៀងថែទាំបាន លួច មិនមែនបាត់បង់ទេ។",
+  "Kru Sokha\u0001Kru Vossandei. He served this village, then served something older. The drowned temple under paddy five sings his name at flood-time.":
+    "គ្រូ វ៉ូសាន់ដេយ។ គាត់បម្រើភូមិនេះ រួចបម្រើអ្វីម្យ៉ាងចំណាស់ជាង។ ប្រាសាទលង់ទឹកក្រោមស្រែលើកទី ៥ ច្រៀងឈ្មោះគាត់ពេលទឹកជំនន់។",
+  "Kru Sokha\u0001You'll want ember-steel and a dancer's blessing before you go under. Chapter two starts at the forge.":
+    "អ្នកនឹងចង់បានដែកធ្យូងនិងពរនៃអ្នករបាំមុនចុះ។ ជំពូកទី ២ ចាប់ផ្ដើមនៅចង្ក្រាន។",
+  "Warden Kralanh\u0001Gate's open. What's outside doesn't knock — keep it that way.":
+    "ទ្វារបើកហើយ។ អ្វីនៅខាងក្រៅមិនដែលគោះទ្វារទេ — រក្សាដូច្នេះចុះ។",
+  "Warden Kralanh\u0001I count the dead at dusk. Lately I've run out of notches.":
+    "ខ្ញុំរាប់អ្នកស្លាប់ពេលព្រលប់។ ថ្មីៗនេះខ្ញុំអស់សម្គាល់ហើយ។",
+  "Warden Kralanh\u0001Chantria's wall holds because the stones remember a song. Song's going thin. You can hear it, if you're unlucky.":
+    "ជញ្ជាំងរបស់ចាន់ត្រាឈ្មង់ព្រោះថ្មចងចាំបទចម្រៀងមួយ។ បទចម្រៀងកំពុងស្គាំង។ អ្នកអាចស្ដាប់វាបាន បើអ្នកមិនសំណាង។",
+  "Warden Kralanh\u0001Scatter the wraiths and come back THROUGH the gate, not over the wall. The wall is a promise, not a shortcut.":
+    "បែកខ្ញែកខ្មោចព្រៃ ហើយត្រឡប់មក តាមទ្វារ កុំលើជញ្ជាំង។ ជញ្ជាំងជាការសន្យា មិនមែនផ្លូវកាត់ទេ។",
+  "Warden Kralanh\u0001Your footwork's better. The dagger's teaching you. That's how it went with your mother.":
+    "ជំហានជើងអ្នកប្រសើរជាងមុន។ ដាវកំពុងបង្រៀនអ្នក។ នោះហើយដែលបានកើតឡើងជាមួយម្ដាយអ្នក។",
+  "Warden Kralanh\u0001Six down. The bell sounds prouder tonight.":
+    "បួនធំចុះហើយ។ ក្រិចឡើងសំឡេងមានមុខមាត់យប់នេះ។",
+  "Warden Kralanh\u0001When you're ready for the deep fields, come to me first. I'll teach you which reeds hide naga holes.":
+    "ពេលអ្នករួចរាល់សម្រាប់ស្រែជ្រៅ មករកខ្ញុំសិន។ ខ្ញុំនឹងបង្រៀនអ្នកថាចម្រោកណាលាក់រន្ធនាគ។",
+  "Warden Kralanh\u0001Endless night, and still you stand. The gate remembers its debts.":
+    "យប់គ្មានទីបញ្ចប់ ហើយអ្នកនៅតែឈ្ងោក។ ទ្វារចងចាំបំណុលរបស់ខ្លួន។",
+  "Warden Kralanh\u0001I marked the missing on my post: bakers, drummers, two monks and a bride. All under paddy five now.":
+    "ខ្ញុំសម្គាល់អ្នកបាត់បង់នៅកន្លែងរបស់ខ្ញុំ៖ អ្នកបង្អែបង្អែកនំ អ្នកចាក់ស្គរ ព្រះសង្ឃពីរនាក់ និងស្រីក្រមុំមួយ។ ទាំងអស់នៅក្រោមស្រែលើកទី ៥ ឥឡូវនេះ។",
+  "Tevy\u0001Charms! Fresh charms! Ward off krasues, creditors, and damp feet.":
+    "កួរ! កួរថ្មី! ការពារក្រសុ ជននេព្រះ និងជើងសើម។",
+  "Tevy\u0001That dagger — I could never afford to stock anything that real.":
+    "ដាវនោះ — ខ្ញុំមិនអាចទិញរបស់ដែលពិតដូចវាស្តុកបានទេ។",
+  "Tevy\u0001Buy a luck-knot? Half of it works, which is the honest average.":
+    "ទិញកួរសំណាង? ពាក់កណ្ដាលរបស់វាដំណើរការ ដែលជាមធ្យមភាគត្រឹមត្រូវ។",
+  "Tevy\u0001Fighting tonight? Take the second knot. The first one's decorative.":
+    "ដូចគ្នាយប់នេះ? យកកួរទី ២ ចុះ។ កួរទី ១ គ្រាន់តែតុបតែង។",
+  "Tevy\u0001Everyone buys protection before the hunt and luck after. You're the first who bought both.":
+    "អ្នកទាំងអស់គ្នាទិញការការពារមុនការតាមរក និងសំណាងក្រោយមក។ អ្នកជាមនុស្សដំបូងដែលទិញទាំងពីរ។",
+  "Tevy\u0001Six wraiths! I'm tying a knot for every one — that's a whole rope of you.":
+    "ខ្មោចព្រៃ ៦! ខ្ញុំកួរមួយសម្រាប់ម្នាក់ៗ — នោះជាពវមូលនៃអ្នក។",
+  "Tevy\u0001The Neak Ta spoke to you? Then my charms might actually start working. Word of you is good for business.":
+    "អ្នកតាណាគនិយាយទៅអ្នក? ដូច្នេះកួររបស់ខ្ញុំប្រហែលចាប់ផ្ដើមដំណើរការពិត។ ពាក្យអំពីអ្នកល្អសម្រាការជំនួញ។",
+  "Tevy\u0001You keep surviving. My luck-knots are going to need a bigger rope.":
+    "អ្នករស់រាន់ទាន់ជានិច្ច។ កួរសំណាងរបស់ខ្ញុំនឹងត្រូវការពវធំជាង។",
+  "Tevy\u0001For you? No charge. For the NEXT hunt — we discuss the bride-price of my entire stall.":
+    "សម្រាប់អ្នក? គ្មានថ្លៃ។ សម្រាប់ការតាមរក ក្រោយ — យើងនឹងសន្និសីទថ្លៃស្រីរបស់រងំទាំងមូលរបស់ខ្ញុំ។",
+  "Srey Noch\u0001You're the ward-orphan. I'm the grave-girl. Between us we cover most of the village's bad news.":
+    "អ្នកជាកំព្រាថែទាំ។ ខ្ញុំជាក្រមុំផ្នូរ។ រវាងយើងពីរនាក់ យើងគ្របដណ្ដប់ដំណឹងអាក្រក់ភាគច្រើនរបស់ភូមិ។",
+  "Srey Noch\u0001I leave rice at the graves so the hungry dead stay fed and the fed dead stay asleep. It works. Mostly.":
+    "ខ្ញុំបន្សល់ស្រូវនៅផ្នូរដើម្បីឱ្យអ្នកស្លាប់ឃ្លាននៅឆ្អិត ហើយអ្នកស្លាប់ឆ្អិតនៅគេង។ វាដំណើរការ។ ភាគច្រើន។",
+  "Srey Noch\u0001If you see lights over the paddies — red coals, flying wrong — don't wave. They wave back.":
+    "បើអ្នកឃើញពន្លឺលើស្រែ — ធ្យូងក្រហម ហោះខុស — កុំបោកដៃ។ ពួកវាបោកដៃតប។",
+  "Srey Noch\u0001Six wraiths scattered and the bells rang all night. The graves were QUIET for once. I slept. Do you know how rare that is?":
+    "ខ្មោចព្រៃ ៦ បែកខ្ញែកហើយក្រិចរងំពេញយប់។ ផ្នូរ ស្ងាត់ ម្ដងនេះ។ ខ្ញុំគេងបាន។ អ្នកដឹងទេថាវាមានតម្លៃប៉ុន្មាន?",
+  "Srey Noch\u0001Grandmother sewed these bows. Red keeps the hungry ones calm, she said. It doesn't. But I look nice at funerals.":
+    "លោកយាយបានដេរធ្នាប់ទាំងនេះ។ ពណ៌ក្រហមរក្សាអ្នកឃ្លានឱ្យស្ងប់ នាងថាដូច្នេះ។ វាមិនដូច្នេះទេ។ តែខ្ញុំមើលទៅស្រស់នៅពិធីសព។",
+  /* --- chapter 3 barks --- */
+  "Kru Sokha\u0001The court priestesses wear candle-crowns — blow out the candles, then the head.":
+    "ព្រះសង្ឃរួក្រុមពាក់មកុដធូប — បំផ្លាញធូបសិន រួចប្រហារក្បាល។",
+  "Kru Sokha\u0001Their spit fans wide. Step sideways, never back.":
+    "ទឹកមាត់របស់ពួកវាបែកធំ។ ចុះចាន់ខាង កុំថយក្រោយ។",
+  "Kru Sokha\u0001The Queen's audience is being held RIGHT NOW — the Hanging Tree, east.":
+    "សវនាការម្ចាស់ក្សត្រីកំពុងធ្វើ ឥឡូវនេះហើយ — ដើមព្យួរខ្មោច ខាងកើត។",
+  "Kru Sokha\u0001She dive-bombs when she drifts close. Keep sideways. Keep striking.":
+    "នាងធ្លាក់ដូចគ្រាប់បែបពេលនាងហៅជិត។ ចុះចាន់ជានិច្ច។ ប្រហារជានិច្ច។",
+  "Kru Sokha\u0001The verse is sung and the wall stands taller for it. My sachets have gone quiet — even the whispers are resting.":
+    "កំណាព្យច្រៀងរួចហើយ ហើយជញ្ជាំងខ្ពស់ជាងមុន។ ថង់របស់ខ្ញុំស្ងាត់ទៅហើយ — ទាំងសំឡេងក្រាបក៏កំពុងសម្រាកដែរ។",
+  "Kru Sokha\u0001Under paddy five the water hums the tune now. The temple is listening. So is the nāga.":
+    "ក្រោមស្រែលើកទី ៥ ទឹកបន្លឺចង្វាក់នោះឥឡូវនេះ។ ប្រាសាទកំពុងស្ដាប់។ នាងនាគក៏ដូច្នេះដែរ។",
+  "Smith Veasna\u0001Ember-steel wants a harder target. The queen's choir burns hotter than any forge-ember I've folded.":
+    "ដែកធ្យូងចង់បានគោលដៅរឹងជាង។ ជំរុំរបស់ម្ចាស់ក្សត្រីឆេះក្ដៅជាងធ្យូងចង្ក្រានណាមួយដែលខ្ញុំធ្លាប់បត់។",
+  "Smith Veasna\u0001Gold crowns mean court steel was buried there once. Watch your footing — the east field eats ankles.":
+    "មកុដមានមានន័យថាដែកក្រុមធ្លាប់កប់នៅទីនោះ។ ប្រយ័ត្នជំហាន — ស្រែខាងកើតឃ្លានកសង្ខេប។",
+  "Smith Veasna\u0001Ember-steel sings two notes now, doesn't it? That's the verse in the wall, answering.":
+    "ដែកធ្យូងច្រៀងពីរចុងឥឡូវនេះ ត្រូវទេ? នោះគឺកំណាព្យក្នុងជញ្ជាំង កំពុងឆ្លើយតប។",
+  "Smith Veasna\u0001The sunken temple's gate is drowned but not sealed. Come sharpen everything first — I mean everything.":
+    "ទ្វារប្រាសាទលង់ទឹកលង់តែមិនបានបិទជិត។ មកស្រួចអ្វីៗទាំងអស់សិន — ខ្ញុំមានន័យថាទាំងអស់។",
+  "Chantria\u0001The east wind carries keening tonight. The Hanging Tree — its fruit talks after dark.":
+    "ខ្យល់ខាងកើតនាំសំឡេងស្រែកក្រែលយប់នេះ។ ដើមព្យួរខ្មោច — ផ្លែវានិយាយក្រោយងងឹត។",
+  "Chantria\u0001Dance with the priestesses, little blade. Lead. They only follow.":
+    "របាំជាមួយព្រះសង្ឃរួចុះ ដាវតូច។ ដឹកនាំចុះ។ ពួកគេត្រឹមតែដើរតាម។",
+  "Chantria\u0001Sokha's rite will pull the name from those hearts. Go — I'll keep the bell steady while you're gone.":
+    "ពិធីរបស់សុខានឹងអូសឈ្មោះចេញពីបេះដូងទាំងនោះ។ ទៅចុះ — ខ្ញុំនឹងរក្សាក្រិចឱ្យនឹងពេលអ្នកចេញទៅ។",
+  "Chantria\u0001The Queen HERSELF? Then the wall is leaning on you tonight, not me. Finish it.":
+    "ម្ចាស់ក្សត្រី ផ្ទាល់? ដូច្នេះជញ្ជាំងទ្រេតលើអ្នកយប់នេះ មិនមែនខ្ញុំទេ។ បញ្ចប់វាចុះ។",
+  "Chantria\u0001Come back with the verse. Come back AT ALL, if you can manage both.":
+    "ត្រឡប់មកវិញជាមួយកំណាព្យ។ ត្រឡប់មកវិញ ទាំងស្រុង បើអ្នកអាចធ្វើទាំងពីរ។",
+  "Chantria\u0001The verse fits the dance like a foot in an old slipper.":
+    "កំណាព្យសមរបាំដូចជើងក្នុងស្បែកជើងចាស់។",
+  "Chantria\u0001When you go under paddy five, I'll dance the wall double-thick. You bring the steel, I'll bring the choreography.":
+    "ពេលអ្នកចុះក្រោមស្រែលើកទី ៥ ខ្ញុំនឹងរបាំជញ្ជាំងឱ្យក្រាស់ពីរដង។ អ្នកនាំដែក ខ្ញុំនាំការចាត់ចែងរបាំ។",
+  "Warden Kralanh\u0001The Hanging Tree, east past the dead paddies. I don't patrol it. What gathers there isn't on my list.":
+    "ដើមព្យួរខ្មោច ខាងកើតផុតស្រែស្លាប់។ ខ្ញុំមិនល្បាតទីនោះទេ។ អ្វីដែលកករទីនោះមិនក្នុងបញ្ជីរបស់ខ្ញុំទេ។",
+  "Warden Kralanh\u0001Priestesses wear candle crowns. Kill the candles, then the head. In that order.":
+    "ព្រះសង្ឃរួពាក់មកុដធូប។ សម្លាប់ធូបសិន រួចក្បាល។ តាមលំដាប់នោះ។",
+  "Warden Kralanh\u0001Queen at the tree? Then the list gets a new page. Make it a short one.":
+    "ម្ចាស់ក្សត្រីនៅដើម? ដូច្នេះបញ្ជីមានទំព័រថ្មី។ ធ្វើឱ្យវាខ្លីចុះ។",
+  "Warden Kralanh\u0001Gate's barred behind you — not against you. Against what might FOLLOW you home.":
+    "ទ្វារដាក់ហាមបិទនៅខ្នងអ្នក — មិនមែននឹងអ្នកទេ។ នឹងអ្វីដែលអាច តាមអ្នកទៅផ្ទះ។",
+  "Warden Kralanh\u0001The wall's humming a verse I half-remember from a dance I never saw. Good work, little blade.":
+    "ជញ្ជាំងបន្លឺកំណាព្យដែលខ្ញុំចងចាំពាក់កណ្ដាលពីរបាំដែលខ្ញុំមិនដែលឃើញ។ ការងារល្អ ដាវតូច។",
+  "Warden Kralanh\u0001Under paddy five now. The gate will be here when you come back. It always is.":
+    "ក្រោមស្រែលើកទី ៥ ឥឡូវនេះ។ ទ្វារនឹងនៅទីនេះពេលអ្នកត្រឡប់មក។ វាតែងតែនៅទីនេះ។",
+  "Srey\u0001Hearts from the hanging tree? I buy those. Quietly. Yes, I hear the contradiction.":
+    "បេះដូងពីដើមព្យួរខ្មោច? ខ្ញុំទិញទាំងនោះ។ ស្ងាត់ៗ។ បាទ/ចាស ខ្ញុំឮការផ្ទុយគ្នានោះ។",
+  "Srey\u0001Court gold is cursed, court RELICS are charming. Bring me relics.":
+    "មាសក្រុមមានពរវិនាស បូជនីយដ្ឋានក្រុមមានគុណសម្បត្តិ។ យកបូជនីយដ្ឋានមកឱ្យខ្ញុំ។",
+  "Srey\u0001A queen's crown left on the mud, and you took only a SONG? You're either noble or terrible at business.":
+    "មកុដម្ចាស់ក្សត្រីបន្សល់នៅលើភក់ ហើយអ្នកយកតែ បទចម្រៀង? អ្នកឬជាអ្នកមានសីលធម៌ឬអាក្រក់ក្នុងជំនួញ។",
+  "Srey\u0001Paddy five, under the water. Everything I never managed to buy is down there.":
+    "ស្រែលើកទី ៥ ក្រោមទឹក។ អ្វីទាំងអស់ដែលខ្ញុំមិនបានទិញបាន នៅទីនោះ។",
+  "Elder Chum\u0001The queen remembers rice-fields green and a man named Vossandei. Pity she kept only the hunger.":
+    "ម្ចាស់ក្សត្រីចងចាំស្រែបៃតងនិងបុរសឈ្មោះវ៉ូសាន់ដេយ។ សោកនាដកម្មដែលនាងរក្សាតែការឃ្លាន។",
+  "Elder Chum\u0001We burned our offerings at that tree when I was a girl. Small wonder it learned to collect.":
+    "យើងដុតសំណើរនៅដើមនោះពេលខ្ញុំនៅជាក្រមុំ។ មិនចម្លែកទេដែលវារៀនប្រមូល។",
+  "Elder Chum\u0001I heard the wall sing the third verse in my sleep. First true sleep in three seasons.":
+    "ខ្ញុំបានឮជញ្ជាំងច្រៀងកំណាព្យទី ៣ ក្នុងសុបិន។ ការគេងពិតដំបូងក្នុងបីរដូវ។",
+  "Elder Chum\u0001The temple under paddy five was OLD when my grandmother was young. Mind what it offers you.":
+    "ប្រាសាទក្រោមស្រែលើកទី ៥ បានចាស់ហើយពេលលោកយាយខ្ញុំនៅក្មេង។ ប្រយ័ត្នអ្វីដែលវាផ្ដល់ដល់អ្នក។",
+  "Dara\u0001The tree lady with the candle-hat! I saw her spit fire at a dog! The dog is fine. I think.":
+    "ស្ត្រីដើមនោះពាក់មួកធូប! ខ្ញុំឃើញនាងបាញ់ភ្លើងទៅឆ្កែមួយ! ឆ្កែនោះអត់អីទេ។ ខ្ញុំគិតដូច្នេះ។",
+  "Dara\u0001Teacher says never whisper back. I ONLY whisper back. It's a game.":
+    "គ្រូបង្រៀនថាកុំក្រាបតប។ ខ្ញុំ ត្រឹមតែក្រាបតប។ វាជាល្បែង។",
+  "Dara\u0001You knocked the crown off the sky-lady's head! I counted the candles — NINE!":
+    "អ្នកបានចាប់មកុដផ្កាយដក់ពីក្បាលស្ត្រីមេឃ! ខ្ញុំរាប់ធូប — ប្រាំបួន!",
+  "Dara\u0001The well hums now. I dropped a pebble in and it hummed BACK.":
+    "អណ្ដូងបន្លឺឥឡូវនេះ។ ខ្ញុំបោះថ្មតូចមួយចុះ ហើយវាបន្លឺ តប។",
+  "Dara\u0001Teacher says the temple is calling your name. Does it know mine? Ask it! Ask it if it knows mine!":
+    "គ្រូបង្រៀនថាប្រាសាទកំពុងហៅឈ្មោះអ្នក។ តើវាដឹងឈ្មោះខ្ញុំទេ? សួរវាចុះ! សួរវាថាតើវាដឹងឈ្មោះខ្ញុំ!",
+  "Dara\u0001I found a fish bone shaped like a boat. It's for the temple. DON'T tell Teacher.":
+    "ខ្ញុំរកឃើញឆ្អឹងត្រីមួយដូចទូក។ វាសម្រាប់ប្រាសាទ។ កុំប្រាប់គ្រូបង្រៀន។",
+  "Dara\u0001The giant marches past my window at night! One step, and the whole house shivers!":
+    "យក្សដើរផុតបង្អួចខ្ញុំពេលយប់! មួយជំហាន ហើយផ្ទះទាំងមូលញ័រ!",
+  "Dara\u0001Teacher says giants are just big men who walked too far from home.":
+    "គ្រូបង្រៀនថាយក្សគ្រាន់តែជាបុរសធំដែលដើរឆ្ងាយពេកពីផ្ទះ។",
+  "Dara\u0001The water went all glowy-violet and the fish came up to WATCH. Fish don't watch!":
+    "ទឹកឡើងពណ៌ស្វាយរស្មី ហើយត្រីឡើងមក មើល។ ត្រីមិនមើលទេ!",
+  "Dara\u0001If the snake-thing asks, I never whispered anything. I never whispered ANYTHING.":
+    "បើអ្វីដែលដូចពស់សួរ ខ្ញុំមិនដែលក្រាបអ្វីទេ។ ខ្ញុំមិនដែលក្រាប អ្វីទាំងអស់។",
+  "Dara\u0001The sky is ORANGE. At night! Everyone says it's the song. I say it's for my pebble in the well. Probably both.":
+    "មេឃពណ៌ ទឹកក្រូចឆ្មា។ ពេលយប់! អ្នកទាំងអស់គ្នាថាវាជាបទចម្រៀង។ ខ្ញុំថាវាសម្រាប់ថ្មតូចរបស់ខ្ញុំក្នុងអណ្ដូង។ ប្រហែលទាំងពីរ។",
+  "Srey Noch\u0001The Hanging Tree collects hearts. I bring it rice instead. So far it hasn't asked for the difference.":
+    "ដើមព្យួរខ្មោចប្រមូលបេះដូង។ ខ្ញុំនាំស្រូវទៅឱ្យវាជំនួស។ ដល់ហើយវាមិនទាន់សុំផ្លាស់ប្ដូរ។",
+  "Srey Noch\u0001The court priestesses blew out their candles once. All of them. The whole east field went dark and something laughed in the well.":
+    "ព្រះសង្ឃរួក្រុមបានផ្លុំពន្លត់ធូបរបស់ពួកគេម្ដង។ ទាំងអស់គ្នា។ ស្រែខាងកើតទាំងមូលងងឹត ហើយអ្វីម្យ៉ាងសើចក្នុងអណ្ដូង។",
+  "Srey Noch\u0001The queen fell and the well hummed for two days. I dropped a candle in. It came back LIT.":
+    "ម្ចាស់ក្សត្រីធ្លាក់ ហើយអណ្ដូងបន្លឺពីរថ្ងៃ។ ខ្ញុំបោះធូបមួយចុះ។ វាមកវិញ ដោយដុត។",
+  "Srey Noch\u0001You're going under paddy five. Take extra rice. Down there the dead aren't homesick — they're loyal.":
+    "អ្នកនឹងចុះក្រោមស្រែលើកទី ៥។ យកស្រូវបន្ថែមទៅ។ នៅទីនោះអ្នកស្លាប់មិនខ្វះភូមិទេ — ពួកគេស្ម័គ្រចិត្ត។",
+  /* --- chapters 4-6: the temple, the whisperer, the wedding --- */
+  "Sovanna Maccha\u0001The gallery water hums around your ankles. Something golden sleeps below the surface, coiled like a question.":
+    "ទឹកយោងបន្លឺជុំវិញសង្ខេបអ្នក។ អ្វីម្យ៉ាងពណ៌មាសកំពុងគេងក្រោមផ្ទៃទឹក ក្រឡប់ដូចសំណួរ។",
+  "Sovanna Maccha\u0001The braziers, little blade. The temple cannot hide from its own fire.":
+    "គ្រែភ្លើងទាំងនោះ ដាវតូច។ ប្រាសាទមិនអាចលាក់ពីភ្លើងរបស់ខ្លួនបានទេ។",
+  "Sovanna Maccha\u0001The giant is marching. He was kind, once — they still say so. Be swift.":
+    "យក្សកំពុងដើរ។ គាត់ធ្លាប់មានចិត្តល្អ ម្ដង — ពួកគេនៅតែនិយាយដូច្នេះ។ ស៊ាំចុះ។",
+  "Sovanna Maccha\u0001When he winds up his slam, coil him. Even mountains can be held.":
+    "ពេលគាត់ត្រវិងដៃដើម្បីបុក ក្រឡប់គាត់ចុះ។ ទាំងភ្នំក៏អាចកាន់ឱ្យនឹងបានដែរ។",
+  "Sovanna Maccha\u0001The white robe at the face tower — that is the man who held the temple's door open. Why would a door need a man? Ask him.":
+    "អាវសនៅប៉មមុខ — នោះគឺបុរសដែលចាំទ្វារប្រាសាទបើក។ ហេតុមូលអ្វីទ្វារត្រូវការបុរស? សួរគាត់ចុះ។",
+  "Sovanna Maccha\u0001His staff charms are grandmother's bones. Free them, little blade.":
+    "កួរដើមរបស់គាត់ជាឆ្អឹងលោកយាយ។ ដួះវាចុះ ដាវតូច។",
+  "Sovanna Maccha\u0001The thing in the water is not a nāga. It only WEARS one — my queen's face is a mask it found in the mud. Break the mask.":
+    "អ្វីក្នុងទឹកមិនមែននាងនាគទេ។ វាត្រឹមតែ ពាក់ — មុខម្ចាស់ក្សត្រីរបស់ខ្ញុំជាម៉ាស់ដែលវារកឃើញក្នុងភក់។ បំបែកម៉ាស់នោះ។",
+  "Sovanna Maccha\u0001The Apsara Blessing is its oldest enemy. The dancer's art was sung over it once, and it still flinches at the rhythm.":
+    "ពរអប្សរាជាសត្រូវចំណាស់បំផុតរបស់វា។ សិល្បៈរបាំធ្លាប់ច្រៀងលើវាម្ដង ហើយវានៅតែញ័រពេលឮចង្វាក់។",
+  "Sovanna Maccha\u0001The song is whole. Swim home, dagger-bearer — the water is quiet now, for the first time in three seasons.":
+    "បទចម្រៀងពេញលេញហើយ។ ហែលទៅផ្ទះចុះ អ្នកកាន់ដាវ — ទឹកស្ងាត់ឥឡូវនេះ ដំបូងក្នុងបីរដូវ។",
+  "Srey Noch\u0001The temple's dead were loyal. That's worse than hungry — loyal things follow orders forever.":
+    "អ្នកស្លាប់របស់ប្រាសាទស្ម័គ្រចិត្ត។ នោះអាក្រក់ជាងការឃ្លាន — អ្វីដែលស្ម័គ្រចិត្តតាមបញ្ជារហូត។",
+  "Srey Noch\u0001Leave rice at the causeway. The drowned bakers remember kneading. It quiets them.":
+    "បន្សល់ស្រូវនៅផ្លូវថ្ម។ អ្នកបង្អែបង្អែកនំលង់ទឹកចងចាំការត្រួយ។ វាធ្វើឱ្យពួកគេស្ងប់។",
+  "Srey Noch\u0001Krong Pali guards the gate. My grandmother said he once carried her whole village across a flood. Now he stands in it.":
+    "ក្រុងបាលីភ្ញាក់ផ្សាទ្វារ។ លោកយាយខ្ញុំថាគាត់ធ្លាប់តាំងភូមិទាំងមូលរបស់នាងឆ្លងកាត់ទឹកជំនន់។ ឥឡូវគាត់ឈ្ងោកក្នុងទឹកនោះ។",
+  "Srey Noch\u0001Rice won't stop him. He isn't hungry. He's just... still on duty.":
+    "ស្រូវមិនបញ្ឈប់គាត់ទេ។ គាត់មិនឃ្លានទេ។ គាត់គ្រាន់តែ... នៅតែនៅលើកាតព្វកិច្ច។",
+  "Srey Noch\u0001The well hummed VIOLET last night. I dropped a candle in. It came back UNLIT. That's new.":
+    "អណ្ដូងបន្លឺពណ៌ ស្វាយ ម្សigtក្រោយ។ ខ្ញុំបោះធូបមួយចុះ។ វាមកវិញ ដោយគ្មានភ្លើង។ នោះជាអ្វីថ្មី។",
+  "Srey Noch\u0001Whatever the kru called up, it answers when you whisper. So don't.":
+    "អ្វីដែលគ្រូហៅឡើង វាឆ្លើយតបពេលអ្នកក្រាប។ ដូច្នេះកុំ។",
+  "Srey Noch\u0001The graves are QUIET and I mean properly quiet — like a held breath let go. I slept until noon. My bows match the sunrise.":
+    "ផ្នូរ ស្ងាត់ ហើយខ្ញុំមានន័យថាស្ងាត់ពិត — ដូចដង្ហើមដែលកាន់តែបានដួររលុង។ ខ្ញុំគេងដល់ថ្ងៃត្រង់។ ធ្នាប់របស់ខ្ញុំដូចព្រះអាទិត្យឡើង។",
+  "Chantria\u0001The causeway east of the Hanging Tree — where the court held its audience. The ramp climbs to the flooded gallery.":
+    "ផ្លូវថ្មខាងកើតនៃដើមព្យួរខ្មោច — កន្លែងដែលក្រុមធ្វើសវនាការ។ ជណ្ដើរឡើងទៅផែនទឹកលង់។",
+  "Chantria\u0001The braziers are the temple's own memory. Light all three and it cannot pretend not to see you.":
+    "គ្រែភ្លើងជាការចងចាំរបស់ប្រាសាទផ្ទាល់។ ដុតទាំងបួនធំហើយវាមិនអាចធ្វើពោតមិនឃើញអ្នកបានទេ។",
+  "Chantria\u0001A giant walked in that flood once and carried children on his shoulders. Remember that, when you cut him down.":
+    "យក្សម្នាក់ដើរក្នុងទឹកជំនន់នោះម្ដង ហើយតាំងកុមារលើស្មៅគាត់។ ចងចាំនោះ ពេលអ្នកប្រហារគាត់។",
+  "Chantria\u0001The coil Sovanna teaches — my dance is its cousin. Hold, then release. Always release.":
+    "ការក្រឡប់ដែលសុវណ្ណមច្ឆាបង្រៀន — របាំរបស់ខ្ញុំជាបងប្អូនជីដូនមួយរបស់វា។ កាន់ រួចដួររលុង។ តែងតែដួររលុង។",
+  "Chantria\u0001Vossandei held the temple's door open. A door held by a MAN. Sokha's rite heard 'we only borrowed his face' — borrowed from WHO, Bopha?":
+    "វ៉ូសាន់ដេយចាំទ្វារប្រាសាទបើក។ ទ្វារដែលចាំដោយ បុរស។ ពិធីរបស់សុខាបានឮ «យើងត្រឹមតែខ្ចីមុខគាត់» — ខ្ចីពី អ្នកណា បុប្ផា?",
+  "Chantria\u0001It wears a drowned nāga's face. And it flinches at my rhythm — the Apsara Blessing, key 4, burn it into your hands.":
+    "វាពាក់មុខនាគលង់ទឹក។ ហើយវាញ័រនៅចង្វាក់របស់ខ្ញុំ — ពរអប្សរា គ្រាប់ចុច ៤ ដុតវាចូលដៃអ្នក។",
+  "Chantria\u0001Stand IN the circle when you dance. The step holds its own ground.":
+    "ឈ្ងោក ក្នុង រង្វង់ពេលអ្នករបាំ។ ជំហានកាន់ដែនដីរបស់ខ្លួន។",
+  "Chantria\u0001You're humming the whole song — I can hear it from the shrine. Come. Both our hands, one circle.":
+    "អ្នកបន្លឺបទចម្រៀងទាំងមូល — ខ្ញុំឮពីទេវស្ថាន។ មកចុះ។ ដៃទាំងពីរនៃយើង រង្វង់មួយ។",
+  "Chantria\u0001A wedding song held this wall all along. Imagine that: the strongest ward ever sung was a marriage.":
+    "បទចម្រៀងមង្គលការកាន់ជញ្ជាំងនេះមកដល់សព្វថ្ងៃ។ ស្រមៃមើលចុះ៖ ថែទាំដែលខ្លាំងបំផុតដែលធ្លាប់ច្រៀងជាការអភិវាមុខ។",
+  "Kru Sokha\u0001Under paddy five the water hums your name — and my sachets won't stop trembling. Take poultices. Two. No — three.":
+    "ក្រោមស្រែលើកទី ៥ ទឹកបន្លឺឈ្មោះអ្នក — ហើយថង់របស់ខ្ញុំមិនឈប់ញ័រ។ យកថ្នាំផ្កាឈូកទៅ។ ពីរ។ អត់ — បួនធំ។",
+  "Kru Sokha\u0001The temple's dead were bakers and drummers. Feed them rice; wounds you'll bind yourself.":
+    "អ្នកស្លាប់របស់ប្រាសាទជាអ្នកបង្អែបង្អែកនំនិងអ្នកចាក់ស្គរ។ បំបៅស្រូវដល់ពួកគេ របួសអ្នកនឹងពួតដោយខ្លួនឯង។",
+  "Kru Sokha\u0001Krong Pali? The giant who carried the village across the flood. My grandmother was one of the children on his shoulders.":
+    "ក្រុងបាលី? យក្សដែលតាំងភូមិឆ្លងកាត់ទឹកជំនន់។ លោកយាយខ្ញុំជាកុមារម្នាក់លើស្មៅគាត់។",
+  "Kru Sokha\u0001Be merciful if you can. And come back to me AFTER — grief binds wounds slower than lotus.":
+    "មានមេត្តាបើអាច។ ហើយត្រឡប់មករកខ្ញុំ ក្រោយមក — ការសោកស្ដាយពួតរបួសយឺតជាងផ្កាឈូក។",
+  "Kru Sokha\u0001The Whisperer wears a stolen face. So did the Queen. So, at the end, did Vossandei. There's a pattern, and I don't like it.":
+    "សំឡេងក្រាបពាក់មុខដែលបានលួច។ ម្ចាស់ក្សត្រីក៏ដូច្នេះដែរ។ ហើយនៅចុងបញ្ចប់ វ៉ូសាន់ដេយក៏ដូច្នេះដែរ។ មានលំនាំមួយ ហើយខ្ញុំមិនចូលចិត្តវាទេ។",
+  "Kru Sokha\u0001The dancer's art is its enemy — my rite heard it flinch at rhythm. Chantria knows. Press 4 and mean it.":
+    "សិល្បៈរបាំជាសត្រូវរបស់វា — ពិធីរបស់ខ្ញុំបានឮវាញ័រនៅចង្វាក់។ ចាន់ត្រាដឹង។ ចុច ៤ ហើយមានន័យពិត។",
+  "Kru Sokha\u0001Dawn. I haven't said that word in three seasons. The song worked because it was never a weapon — it was a promise.":
+    "ព្រលឹម។ ខ្ញុំមិនបាននិយាយពាក្យនោះក្នុងបីរដូវទេ។ បទចម្រៀងដំណើរការព្រោះវាមិនដែលជាអាវុធ — វាជាការសន្យា។",
+  "Kru Sokha\u0001Your mother sang it at weddings, did you know? She sang it at OURS, once, before you were born.":
+    "ម្ដាយអ្នកច្រៀងវានៅពិធីមង្គលការ អ្នកដឹងទេ? នាងច្រៀងវានៅ របស់យើង ម្ដង មុនអ្នកកើត។",
+  "Smith Veasna\u0001The temple gallery — that's where the old road climbs. My grandfather cut the ramp stones. They'll hold your weight, and your temper.":
+    "យោងប្រាសាទ — នោះគឺកន្លែងដែលផ្លូវចាស់ឡើង។ លោកតារបស់ខ្ញុំបានកាត់ថ្មជណ្ដើរ។ វានឹងកាន់ទម្ងន់អ្នក ហើយទឹកចិត្តអ្នក។",
+  "Smith Veasna\u0001Ember-steel under water: the blade will steam. Let it. It's learning the second half of fire.":
+    "ដែកធ្យូងក្រោមទឹក៖ ដាវនឹងឡើងហៅមុំ។ ឱ្យវាចុះ។ វាកំពុងរៀនពាក់កណ្ដាលទី ២ នៃភ្លើង។",
+  "Smith Veasna\u0001The giant of the gate. I forged horseshoes for his boots' REMEMBERED horses — my grandfather did, anyway. Family trade, family ghosts.":
+    "យក្សនៃទ្វារ។ ខ្ញុំបានធ្វើកាបះសេះសម្រាប់សេះដែល ចងចាំ នៃស្បែកជើងគាត់ — លោកតារបស់ខ្ញុំធ្វើវាហើយ។ ជំនួញគ្រួសារ ខ្មោចគ្រួសារ។",
+  "Smith Veasna\u0001Strike the coat, not the helmet. The helmet's doctrine. The coat is the man.":
+    "ប្រហារអាវផោម កុំប្រហារមួក។ មួកជាគំនិត។ អាវផោមជាមនុស្ស។",
+  "Smith Veasna\u0001The Whisperer — so the kru was holding the door from the INSIDE. Iron in a fire doesn't blame the hand that forged it, but I do.":
+    "សំឡេងក្រាប — ដូច្នេះគ្រូចាំទ្វារពី ខាងក្នុង។ ដែកក្នុងភ្លើងមិនដកហូតដៃដែលធ្វើវាទេ តែខ្ញុំធ្វើ។",
+  "Smith Veasna\u0001Come sharpen everything after. I mean everything. Dawn is coming and we'll need it.":
+    "មកស្រួចអ្វីៗទាំងអស់ក្រោយមក។ ខ្ញុំមានន័យថាទាំងអស់។ ព្រលឹមមកដល់ហើយយើងនឹងត្រូវការវា។",
+  "Smith Veasna\u0001Dawn. My forge looks small in daylight. That's all right. So does everything true.":
+    "ព្រលឹម។ ចង្ក្រានរបស់ខ្ញុំមើលទៅតូចពេលថ្ងៃ។ អត់អីទេ។ អ្វីដែលពិតក៏ដូច្នេះដែរ។",
+  "Warden Kralanh\u0001The causeway east — I don't patrol past the Hanging Tree. The stones there remember a different post.":
+    "ផ្លូវថ្មខាងកើត — ខ្ញុំមិនល្បាតផុតដើមព្យួរខ្មោចទេ។ ថ្មទីនោះចងចាំកន្លែងផ្សេង។",
+  "Warden Kralanh\u0001Braziers: the temple's own memory. Light them and the temple must see you plainly.":
+    "គ្រែភ្លើង៖ ការចងចាំរបស់ប្រាសាទផ្ទាល់។ ដុតពួកវាហើយប្រាសាទត្រូវឃើញអ្នកច្បាស់។",
+  "Warden Kralanh\u0001Krong Pali. My list has a page for him — one line, sixty years old: 'still marching.' You'll close it.":
+    "ក្រុងបាលី។ បញ្ជីរបស់ខ្ញុំមានទំព័រសម្រាប់គាត់ — មួយបន្ទាត់ អាយុអំសាមបួនឆ្នាំ៖ «នៅតែដើរ។» អ្នកនឹងបិទវា។",
+  "Warden Kralanh\u0001A soldier's ghost keeps a soldier's rhythm. Break the rhythm.":
+    "ខ្មោចទាហានរក្សាចង្វាមទាហាន។ បំបែកចង្វាក់នោះ។",
+  "Warden Kralanh\u0001The Whisperer wears a drowned nāga's face — that's why the gate's song twisted. It's been impersonating our guardian since the drowning.":
+    "សំឡេងក្រាបពាក់មុខនាគលង់ទឹក — នោះហើយជាមូលហេតុបទចម្រៀងទ្វារខុស។ វាធ្លាប់ធ្វើពោតជាអ្នកថែរក្សាយើងតាំងពីការលង់ទឹក។",
+  "Warden Kralanh\u0001Dawn's coming. The gate will want to see it. So will I.":
+    "ព្រលឹមមកដល់ហើយ។ ទ្វារនឹងចង់ឃើញវា។ ខ្ញុំក៏ដូច្នេះដែរ។",
+  "Warden Kralanh\u0001The gate stood all night and the bell rang like a wedding. I counted NOTHING at dusk. Nothing. First time in three seasons.":
+    "ទ្វារឈ្ងោកពេញយប់ ហើយក្រិចរងំដូចពិធីមង្គលការ។ ខ្ញុំរាប់ គ្មានអ្វី ពេលព្រលប់។ គ្មានអ្វី។ ដំបូងក្នុងបីរដូវ។",
+  "Srey\u0001Everything I never managed to buy is under paddy five — and now you're going to LOOK at it. Noble. Terrible. Both.":
+    "អ្វីទាំងអស់ដែលខ្ញុំមិនបានទិញបាននៅក្រោមស្រែលើកទី ៥ — ហើយឥឡូវអ្នកនឹងទៅ មើល វា។ មានសីលធម៌។ អាក្រក់។ ទាំងពីរ។",
+  "Srey\u0001Reliquaries in the gallery. Bring me what you don't keep. Quietly.":
+    "បូជនីយដ្ឋានក្នុងយោង។ យកអ្វីដែលអ្នកមិនរក្សាទៅឱ្យខ្ញុំ។ ស្ងាត់ៗ។",
+  "Srey\u0001Krong Pali's pay-pouch is still in his coat. Sixty years of soldier's wages. Yes, I know whose pocket it should return to. Yes, I'll broker it.":
+    "ថង់ប្រាក់របស់ក្រុងបាលីនៅក្នុងអាវផោមរបស់គាត់។ ប្រាំមិងឆ្នាំនៃប្រាក់ខែទាហាន។ បាទ/ចាស ខ្ញុំដឹងថាត្រូវត្រឡប់ទៅហោប៉ៅអ្នកណា។ បាទ/ចាស ខ្ញុំនឹងជាអ្នកនៅកណ្ដាល។",
+  "Srey\u0001Court gold was cursed. Temple gold is worse — it RINGS wrong. Sell it to me anyway; I know a shrine that melts curses.":
+    "មាសក្រុមមានពរវិនាស។ មាសប្រាសាទអាក្រក់ជាង — វា រងំ ខុស។ លក់វាទៅខ្ញុំក៏ដោយ ខ្ញុំស្គាល់ទេវស្ថានមួយដែលរលាយពរវិនាស។",
+  "Srey\u0001Dawn prices are honest prices. Even I can't cheat the sunrise. One last mark-up, then the market changes forever.":
+    "តម្លៃព្រលឹមជាតម្លៃត្រឹមត្រូវ។ ទាំងខ្ញុំក៏មិនអាចក្លែងព្រះអាទិត្យឡើងបានទេ។ ដាក់ថ្លៃចុងក្រោយម្ដង រួចទីផ្សារប្ដូររហូត។",
+  "Elder Chum\u0001The temple was OLD when my grandmother was young. It remembers every hand that lit a fire in it. Light the braziers — it will remember yours kindly.":
+    "ប្រាសាទ ចាស់ ពេលលោកយាយខ្ញុំនៅក្មេង។ វាចងចាំដៃទាំងអស់ដែលដុតភ្លើងក្នុងវា។ ដុតគ្រែភ្លើងចុះ — វានឹងចងចាំដៃអ្នកដោយចិត្តល្អ។",
+  "Elder Chum\u0001Krong Pali carried my village across a flood when I was six. I sat on his shoulder and counted the roofs. Be kind, child. Then be swift.":
+    "ក្រុងបាលីតាំងភូមិរបស់ខ្ញុំឆ្លងទឹកជំនន់ពេលខ្ញុំអាយុបួនធំ។ ខ្ញុំអង្គុយលើស្មៅគាត់ ហើយរាប់ដំបូល។ មានចិត្តល្អចុះ កូន។ រួចស៊ាំចុះ។",
+  "Elder Chum\u0001The Whisperer is not a ghost. Ghosts were PEOPLE once. That thing is older than people — it only borrows them.":
+    "សំឡេងក្រាបមិនមែនខ្មោចទេ។ ខ្មោចធ្លាប់ជា មនុស្ស ម្ដង។ អ្វីនោះចំណាស់ជាងមនុស្ស — វាត្រឹមតែខ្ចីពួកគេ។",
+  "Elder Chum\u0001I heard the whole song in my sleep — the wedding procession, Preah Thong to Neang Neak, the nāga singing her people into one. We are all at that wedding tonight.":
+    "ខ្ញុំបានឮបទចម្រៀងទាំងមូលក្នុងសុបិន — ដំណើរពិធីមង្គលការ ព្រះធុងទៅនាងនាក នាងនាគច្រៀងប្រជាជនរបស់នាងទៅជាមួយ។ យើងទាំងអស់គ្នានៅពិធីមង្គលការនោះយប់នេះ។",
+  "Tevy\u0001Going UNDER paddy five? Wet-knot for the climb, dry-knot for the gallery. I invented the dry-knot yesterday. It works. Probably.":
+    "ចុះ ក្រោម ស្រែលើកទី ៥? កួរសើមសម្រាប់ឡើង កួរស្ងូតសម្រាប់យោង។ ខ្ញុំបានបង្កើតកួរស្ងូតម្សិលម្ងៃ។ វាដំណើរការ។ ប្រហែល។",
+  "Tevy\u0001Stock up — Sokha's stall has the healing, mine has the luck. You'll want both.":
+    "ស្តុកឱ្យច្រើន — រងំរបស់សុខាមានការព្យាបាល របស់ខ្ញុំមានសំណាង។ អ្នកនឹងចង់បានទាំងពីរ។",
+  "Tevy\u0001The giant? Buy the slow-knot. His slam is a whole argument, and knots win arguments.":
+    "យក្ស? ទិញកួរយឺតចុះ។ ការបុករបស់គាត់ជាការជជែកទាំងមូល ហើយកួរឈ្នះការជជែក។",
+  "Tevy\u0001If you fall, I'm buying your rope back at a premium. Don't fall.":
+    "បើអ្នកធ្លាក់ ខ្ញុំនឹងទិញពវរបស់អ្នកត្រឡប់មកវិញក្នុងតម្លៃខ្ពស់។ កុំធ្លាក់។",
+  "Tevy\u0001Violet light in the well, whispering in the gallery — for that you need the red knot AND the wet knot AND my whole stall's luck.":
+    "ពន្លឺស្វាយក្នុងអណ្ដូង ក្រាបក្នុងយោង — សម្រាប់នោះអ្នកត្រូវការកួរក្រហម និងកួរសើម និងសំណាងរងំទាំងមូលរបស់ខ្ញុំ។",
+  "Tevy\u0001The dawn knot! I tied one the night the queen fell, remember? Look at it now. Look at it. TIED ITSELF.":
+    "កួរព្រលឹម! ខ្ញុំកួរមួយយប់ដែលម្ចាស់ក្សត្រីធ្លាក់ ចងចាំទេ? មើលវាឥឡូវនេះចុះ។ មើលវាចុះ។ កួរ ខ្លួនឯង។"
+});
+
+/* system quotes — waves, blessings, items, respawn */
+Object.assign(KM_DL, {
+  "*The bell quiets… then the reeds move again.": "ក្រិចស្ងាត់... រួចចម្រោកផ្លាស់ទីម្ដងទៀត។",
+  "*The bell quiets… the night only deepens.": "ក្រិចស្ងាត់... យប់ស្គាំងជាងមុន។",
+  "*The bell rings once — gently, the way bells ring at weddings.": "ក្រិចរងំម្ដង — ស្រប់ ៗ ដូចក្រិចរងំនៅពិធីមង្គលការ។",
+  "*Your spirit is thin. Rest inside the ward, or burn incense.": "វិញ្ញាណអ្នកស្គាំង។ សម្រាកក្នុងថែទាំ ឬដុតធូប។",
+  "*The moonward weave takes your weight. For a breath, you are the shadow of a shadow.": "សរសៃទៅកាន់ព្រះចន្ទយកទម្ងន់អ្នក។ មួយដង្ហើម អ្នកជាស្រមោលនៃស្រមោល។",
+  "*The coil closes on empty reeds. Nothing dead stands within its circle.": "ការក្រឡប់បិទលើចម្រោកទំនេរ។ គ្មានអ្នកស្លាប់ឈ្ងោកក្នុងរង្វង់របស់វា។",
+  "*Chantria's choreography runs through your hands like river water. Stand and dance.": "ការចាត់ចែងរបាំរបស់ចាន់ត្រាដើរតាមដៃអ្នកដូចទឹកទន្លេ។ ឈ្ងោកនៅ ហើយរបាំ។",
+  "*No poultice left. Kru Sokha sells them — bring gold.": "អស់ថ្នាំផ្កាឈូកហើយ។ គ្រូ សុខា លក់វា — យកមាសទៅ។",
+  "*The lotus draws the ache out like a splinter. Sokha's hands taught her well.": "ផ្កាឈូកអូសការឈឺចាប់ចេញដូចប្រមាឈ។ ដៃរបស់សុខាបង្រៀននាងល្អ។",
+  "*Smoke opens the eye the living keep shut. The dead show their outlines now.": "ហៅមុំបើកភ្នែកដែលអ្នករស់រក្សាបិទ។ អ្នកស្លាប់បង្ហាញខ្លោងដងខ្លួនឥឡូវនេះ។",
+  "*Rice scatters on empty mud. The hungry dead are elsewhere tonight.": "ស្រូវបាច់លើភក់ទំនេរ។ អ្នកស្លាប់ឃ្លាននៅកន្លែងផ្សេងយប់នេះ។",
+  "*Tevy's knot tightens at your wrist. Half of it works — and the half that works is enough.": "កួររបស់ទេវីតឹងនៅដៃអ្នក។ ពាក់កណ្ដាលរបស់វាដំណើរការ — ហើយពាក់កណ្ដាលដែលដំណើរការគ្រប់គ្រាន់។",
+  "*The stun-bell rings you back to the ward-stones. The night is patient.": "ក្រិចភ្ញាក់ផ្សាបញ្ជូនអ្នកត្រឡប់ទៅថ្មថែទាំ។ យប់មានចិត្តឱ្យ។",
+  "*The spirit of the dagger burns brighter.": "វិញ្ញាណនៃដាវឆេះភ្លឺជាងមុន។"
+});
+
+/* dynamic strings — quest lines carry live counts, so these are
+   regex-substitution rules applied after the exact tables miss */
+const KM_R = [
+  [/^Slay the wraiths beyond the south gate — (\d+)\/(\d+)\.$/, "ប្រហារខ្មោចព្រៃនៅក្រោយទ្វារខាងត្បូង — $1/$2។"],
+  [/^Slay the wraiths \((\d+)\/(\d+)\)\.$/, "ប្រហារខ្មោចព្រៃ ($1/$2)។"],
+  [/^Gather the krasue embers \((\d+)\/(\d+)\)\.$/, "ប្រមូលធ្យូងក្រសុ ($1/$2)។"],
+  [/^Hunt krasues beyond the south gate — embers (\d+)\/(\d+)\.$/, "តាមរកក្រសុនៅក្រោយទ្វារខាងត្បូង — ធ្យូង $1/$2។"],
+  [/^Hunt the queen's priestesses at the Hanging Tree, east field — (\d+)\/(\d+)\.$/, "តាមរកព្រះសង្ឃរួនៃម្ចាស់ក្សត្រីនៅដើមព្យួរខ្មោច ស្រែខាងកើត — $1/$2។"],
+  [/^Slay the court priestesses \((\d+)\/(\d+)\)\.$/, "ប្រហារព្រះសង្ឃរួក្រុម ($1/$2)។"],
+  [/^Light the three nāga braziers on the sunken temple's terrace — (\d+)\/(\d+)\.$/, "អុំគ្រែភ្លើងនាគ ៣ នៅផ្ទាល់មាត់ដំបូលប្រាសាទលង់ទឹក — $1/$2។"],
+  [/^A priestess falls — (\d+) of (\d+)\. The keening over the east field thins\.$/, "ព្រះសង្ឃរួម្នាក់ធ្លាក់ — $1 ក្នុង $2។ សំឡេងក្រែលលើស្រែខាងកើតស្រាលចុះ។"],
+  [/^The drowned serpent remembers its coiling — (\d+) bound fast\.$/, "នាគលង់ទឹកចងចាំការក្រឡប់របស់ខ្លួន — ចាប់ឱ្យនឹង $1។"],
+  [/^You scatter the rice the way Noch taught you — (\d+) hungry dead forget their hunger\.$/, "អ្នកបាច់ស្រូវដូចពុធាបង្រៀន — អ្នកស្លាប់ដែលឃ្លាន $1 ភ្លេចការឃ្លានរបស់វា។"],
+  [/^WAVE (\d+)$/, "ជំរុា $1"],
+  [/^NIGHT (\d+)$/, "យប់ $1"],
+  [/^LEVEL (\d+)$/, "កម្រិត $1"],
+  [/^THE WARDEN — WAVE (\d+)$/, "អ្នកភ្ញាក់ផ្សា — ជំរុា $1"],
+  [/^NEW BLESSING — (.+?) \(KEY (\d)\)$/, "ពរថ្មី — $1 (គ្រាប់ចុច $2)"],
+  [/^Dark slabs left: (\d+)\. They hum quiet when they're fed\.$/, "ផ្ទាំងថ្មងងឹតដែលនៅសល់៖ $1។ ពួកវាបន្លឺស្ងាត់ពេលឆ្អិត។"],
+  [/^Stakes still down: (\d+)\. The dead snap what stands; they can't help it\.$/, "សសរនៅតែដួល៖ $1។ អ្នកស្លាប់ដាច់អ្វីដែលឈ្ងោក ពួកគេមិនអាចទប់បានទេ។"],
+  [/^SIDE QUEST — THE GRAVE-GIRL'S ROUNDS$/, "បេសកកម្មបន្ទាប់ — ជុំរបស់ក្រមុំផ្នូរ"],
+  [/^SIDE QUEST — THE KITE OF THE WRONG ARMY$/, "បេសកកម្មបន្ទាប់ — ខ្យល់អាមនៃកងទ័ពខុស"],
+  [/^SIDE QUEST — THE WARDEN'S TALLY$/, "បេសកកម្មបន្ទាប់ — ការរាប់របស់អ្នកភ្ញាក់ផ្សា"],
+  [/^SIDE QUEST CLEARED — THE GRAVE-GIRL'S ROUNDS$/, "បេសកកម្មបន្ទាប់រួចរាល់ — ជុំរបស់ក្រមុំផ្នូរ"],
+  [/^SIDE QUEST CLEARED — THE KITE OF THE WRONG ARMY$/, "បេសកកម្មបន្ទាប់រួចរាល់ — ខ្យល់អាមនៃកងទ័ពខុស"],
+  [/^SIDE QUEST CLEARED — THE WARDEN'S TALLY$/, "បេសកកម្មបន្ទាប់រួចរាល់ — ការរាប់របស់អ្នកភ្ញាក់ផ្សា"],
+  [/^SIDE QUEST — (.+)$/, "បេសកកម្មបន្ទាប់ — $1"],
+  [/^SIDE QUEST CLEARED — (.+)$/, "បេសកកម្មបន្ទាប់រួចរាល់ — $1"],
+  [/^Feed the dark grave-slabs with rice \((\d+)\/(\d+)\)\.$/, "បំបៅផ្ទាំងថ្មងងឹតដោយស្រូវ ($1/$2)។"],
+  [/^Fetch Dara's kite from the dead tree east \((\d+)\/(\d+)\)\.$/, "យកខ្យល់អាមដារាពីដើមស្លាប់ខាងកើត ($1/$2)។"],
+  [/^Raise the warden's three tally-stakes \((\d+)\/(\d+)\)\.$/, "ឡើងសសរសម្គាល់របស់អ្នកភ្ញាក់ផ្សា ($1/$2)។"]
+];
+
+/* translate one dialogue/quote line (speaker-scoped, then global, then rules) */
+function DL(line, speaker) {
+  if (LANG !== "km") return line;
+  if (speaker) {
+    const s = KM_DL[speaker + "\u0001" + line]; if (s) return s;
+  }
+  const g = KM_DL["*" + line]; if (g) return g;
+  for (const [re, sub] of KM_R) if (re.test(String(line))) return String(line).replace(re, sub);
+  return line;
+}
+/* translate a quote's source tag; numeric suffixes (waves, levels) survive */
+function DSRC(s) {
+  if (LANG !== "km" || !s) return s;
+  if (KM_SRC[s]) return KM_SRC[s];
+  const m = String(s).match(/^((?:THE WARDEN — WAVE|WAVE|NIGHT|NEW BLESSING —|LEVEL)\s*)(\d+)$/);
+  if (m) return (KM_SRC[m[1].trim()] ? KM_SRC[m[1].trim()] + " " : m[1]) + m[2];
+  return s;
+}
+
 /* phase-aware line lookup (falls back to the NPC's static lines) */
 function storyLines(name) {
   const set = STORY.lines[name];
@@ -9075,6 +9877,299 @@ const STORY_HOOKS = {
   },
   "Tevy": () => { if (QUEST.phase >= 1) shopOpen("tevy"); }
 };
+
+/* ============================================================
+   SIDEQ — the side errands of Sambok Chas
+   Three optional quests that open once chapter 1 is cleared.
+   They use the same dialogue/interactable pipelines as the main
+   beats, pay in riel, items and relics, and never gate the plot.
+     graves — Srey Noch: feed the three dark grave-slabs (rice)
+     kite   — Dara: cut her kite out of the dead tree east
+     tally  — Warden Kralanh: raise his three fallen tally-stakes
+   ============================================================ */
+const SIDEQ = {
+  def: {
+    graves: { npc: "Srey Noch", need: 3, title: "THE GRAVE-GIRL'S ROUNDS",
+      kind: "grave" },
+    kite:   { npc: "Dara", need: 1, title: "THE KITE OF THE WRONG ARMY",
+      kind: "kite" },
+    tally:  { npc: "Warden Kralanh", need: 3, title: "THE WARDEN'S TALLY",
+      kind: "tally" }
+  },
+  st: { graves: { state: "none", progress: 0 },
+        kite:   { state: "none", progress: 0 },
+        tally:  { state: "none", progress: 0 } },
+  props: {},                                 /* marker groups by quest id */
+  open() { return QUEST.phase >= 3; },
+  /* offer / turn-in conversations, checked after the main beats */
+  beat(speaker) {
+    if (!this.open()) return null;
+    for (const id in this.def) {
+      const D = this.def[id], S = this.st[id];
+      if (D.npc !== speaker) continue;
+      if (S.state === "done") return null;
+      if (S.state === "none") {
+        if (id === "graves") return {
+          lines: [
+            "The rain put the candles out on the graves past the east wall. Three dark slabs, no rice, restless neighbors.",
+            "Bring a handful of rice to each — my kind of housekeeping. Tevy sells what the dead like to eat.",
+            "They'll hum when they're fed. You'll hear it."],
+          cb: () => this.accept("graves") };
+        if (id === "kite") return {
+          lines: [
+            "My kite! The east wind took it — it's hanging in the dead tree past the gate, like a flag for the WRONG army.",
+            "You jump high now, everyone says. Get it down before the hanging ladies find it. They collect things."],
+          cb: () => this.accept("kite") };
+        if (id === "tally") return {
+          lines: [
+            "Three of my tally-stakes are down. The dead lean on them at night and snap the strings.",
+            "One south of the gate, two out east. Count what I cannot raise — I'll owe you, and the gate pays its debts."],
+          cb: () => this.accept("tally") };
+      }
+      if (S.state === "active") {
+        if (S.progress >= D.need) {
+          if (id === "graves") return {
+            lines: [
+              "You hear that? The graves are humming. First time since the drowning.",
+              "Take the bow. Grandmother tied it for a warden who owed me. Red keeps the hungry ones calm — mostly."],
+            cb: () => this.complete("graves") };
+          if (id === "kite") return {
+            lines: [
+              "MY KITE! You got it down! It isn't even torn — the wind just wanted to borrow it!",
+              "Here — a luck-knot from my own stall money. It's the kind that works. All of it. I checked."],
+            cb: () => this.complete("kite") };
+          if (id === "tally") return {
+            lines: [
+              "Three stakes up, strings tight. I can count the dusk's dead properly again.",
+              "The gate pays what it owes: coin, and Sokha's best poultice. The wall leans lighter on you tonight."],
+            cb: () => this.complete("tally") };
+        }
+        /* mid-quest nudge */
+        if (id === "graves") return { lines: [`Dark slabs left: ${D.need - S.progress}. They hum quiet when they're fed.`], cb: null };
+        if (id === "kite") return { lines: ["The tree past the gate, east. My kite is the red one. Everything else up there is worse."], cb: null };
+        if (id === "tally") return { lines: [`Stakes still down: ${D.need - S.progress}. The dead snap what stands; they can't help it.`], cb: null };
+      }
+    }
+    return null;
+  },
+  accept(id) {
+    this.st[id].state = "active";
+    const g = this.props[id]; if (g) g.visible = true;
+    const t = this.def[id].title;
+    hudQuote({
+      graves: "Three dark slabs wait past the east wall. Feed them rice and listen for the hum.",
+      kite: "A red kite hangs in the dead tree east of the gate. Fetch it down.",
+      tally: "Three tally-stakes lie snapped in the fields. Raise them again."
+    }[id], "SIDE QUEST — " + t);
+    SFX.bell();
+    hudQuest();
+  },
+  collect(id) {
+    const S = this.st[id], D = this.def[id];
+    if (S.state !== "active" || S.progress >= D.need) return;
+    S.progress++;
+    hudQuote({ graves: "The slab drinks the offering. Something under the mud hums — low, grateful.",
+      kite: "The kite comes free of the branch, trailing half the tree's ribbons. It smells of ember and rain.",
+      tally: "The stake stands. The snapped string reties itself — the warden's knots remember their work."
+    }[id], "SIDE QUEST — " + D.title);
+    SFX.coin();
+    hudQuest();
+    if (S.progress >= D.need) {
+      const D2 = this.def[id];
+      setTimeout(() => { if (W3.state === "play") hudQuote(
+        { graves: "The graves are fed. Bring the hum back to Noch.",
+          kite: "The kite is safe. Dara will want it back.",
+          tally: "The tally stands whole again. Report to Kralanh." }[id],
+        "SIDE QUEST — " + D2.title); }, 3800);
+    }
+  },
+  complete(id) {
+    const S = this.st[id], D = this.def[id];
+    S.state = "done";
+    const g = this.props[id]; if (g) g.visible = false;
+    if (id === "graves") {
+      P_player.relics.push({ name: "Noch's Red Bow", v: 40 });
+      P_player.inv.rice = (P_player.inv.rice || 0) + 1;
+      rewardPlayer(30, 25);
+    } else if (id === "kite") {
+      P_player.inv.charm = (P_player.inv.charm || 0) + 1;
+      rewardPlayer(20, 15);
+    } else if (id === "tally") {
+      P_player.inv.poultice = (P_player.inv.poultice || 0) + 1;
+      rewardPlayer(35, 40);
+    }
+    hudUpdateVitals();
+    SFX.levelup();
+    hudQuote({ graves: "Noch ties the bow to your belt. The graves hum behind you, fed and dreamless.",
+      kite: "The kite rides the wind again — from Dara's hand this time, on a string she trusts.",
+      tally: "Kralanh notches his post. For the first time tonight the count comes out even."
+    }[id], "SIDE QUEST CLEARED — " + D.title);
+    hudQuest();
+  },
+  /* quest-panel additions: one header row + live progress rows */
+  hudItems() {
+    if (!this.open()) return [];
+    const out = [];
+    for (const id in this.def) {
+      const D = this.def[id], S = this.st[id];
+      if (S.state !== "active") continue;
+      const label = { graves: "Feed the dark grave-slabs with rice",
+        kite: "Fetch Dara's kite from the dead tree east",
+        tally: "Raise the warden's three tally-stakes" }[id];
+      out.push(["SIDE QUEST — " + D.title, false]);
+      out.push([`${label} (${S.progress}/${D.need}).`, S.progress >= D.need]);
+    }
+    return out;
+  },
+  /* world props — called once from boot() after buildWorld */
+  build(scene) {
+    /* --- graves: three dark slabs with rice bowls --- */
+    const graves = [[-8, 32], [4, 35], [14, 29]];
+    graves.forEach(([x, z], i) => {
+      const y = groundY(x, z);
+      const slab = new THREE.Mesh(cylGeo(.55, .62, .16, 0x4a4640, 7), toonMat(0x4a4640));
+      slab.position.set(x, y + .08, z);
+      const bowl = new THREE.Mesh(sphGeo(.11, 0x9a8a6a, 8), toonMat(0x9a8a6a));
+      bowl.scale.y = .55; bowl.position.set(x + .5, y + .12, z + .3);
+      scene.add(slab, bowl);
+      const glow = new THREE.Mesh(sphGeo(.07, 0x70e8ff, 6),
+        new THREE.MeshBasicMaterial({ color: 0x70e8ff, transparent: true, opacity: .85 }));
+      glow.position.set(x, y + .55, z);
+      const g = new THREE.Group(); g.add(glow); g.visible = false;
+      g.position.set(0, 0, 0); scene.add(g);
+      this.props["graves:" + i] = g;
+      World.interactables.push({
+        name: "Dark grave slab", verb: "Offer", x, z, r: 1.9,
+        onUse: () => {
+          const S = this.st.graves;
+          if (S.state !== "active") { hudQuote("A drowned grave-slab. The rice bowl is empty and the dark is patient.", "GRAVE SLAB"); return; }
+          if (S.progress >= 3) { hudQuote("This one is fed. It hums like a held note.", "GRAVE SLAB"); return; }
+          if ((P_player.inv.rice || 0) <= 0) {
+            hudQuote("Your pouch has no rice. Tevy's stall sells what the dead like to eat.", "NO RICE"); return;
+          }
+          P_player.inv.rice--; hudUpdateVitals();
+          Particles.burst(x, .6, z, 16, { color: [0xf3ead2, 0x70e8ff], spdMin: .2, spdMax: 1, sMax: .05, lifeMax: 1, grav: -1.4 });
+          SFX.bell();
+          glow.visible = false;
+          this.collect("graves");
+        }
+      });
+    });
+    /* --- Dara's kite: red diamond high in a dead tree east --- */
+    {
+      const KX = 26, KZ = 14, ky = groundY(KX, KZ) + 3.4;
+      deadTree(scene, KX, KZ, 1.5, 71);
+      const kite = new THREE.Group();
+      const paper = new THREE.Mesh(new THREE.ConeGeometry(.34, .8, 4), toonMat(0xc8202f));
+      paper.rotation.x = Math.PI; paper.position.y = .18;
+      const bow1 = new THREE.Mesh(sphGeo(.045, 0xd6a94a, 6), toonMat(0xd6a94a));
+      bow1.position.set(.16, -.32, 0);
+      const tail = new THREE.Mesh(cylGeo(.012, .012, 1.1, 0xd6a94a, 5), toonMat(0xd6a94a));
+      tail.position.set(.1, -.7, 0); tail.rotation.z = .2;
+      kite.add(paper, bow1, tail);
+      kite.position.set(KX, ky, KZ); kite.rotation.z = .35;
+      scene.add(kite);
+      const g = new THREE.Group(); g.visible = false; scene.add(g);
+      this.props["kite:0"] = g;
+      World.interactables.push({
+        name: "Dara's kite", verb: "Take", x: KX, z: KZ, r: 2.4,
+        onUse: () => {
+          const S = this.st.kite;
+          if (S.state !== "active") { hudQuote("A kite wedged high in the branches — red paper, a gold tail, too far to reach without a reason.", "STUCK KITE"); return; }
+          kite.visible = false;
+          Particles.burst(KX, ky, KZ, 12, { color: [0xc8202f, 0xd6a94a], spdMin: .4, spdMax: 1.6, sMax: .06, lifeMax: .8, grav: -1 });
+          SFX.swish(.8);
+          this.collect("kite");
+        }
+      });
+    }
+    /* --- tally stakes: three snapped posts in the fields --- */
+    const stakes = [[-12, 31], [7, 36], [18, 34]];
+    stakes.forEach(([x, z], i) => {
+      const y = groundY(x, z);
+      const post = new THREE.Mesh(cylGeo(.045, .06, 1.15, 0x5a4632, 6), toonMat(0x5a4632));
+      post.position.set(x, y + .5, z); post.rotation.z = 1.25; post.rotation.y = i;
+      const notch = new THREE.Mesh(sphGeo(.05, 0xf3ead2, 6), toonMat(0xf3ead2));
+      notch.position.set(x + .1, y + .12, z);
+      scene.add(post, notch);
+      const g = new THREE.Group(); g.visible = false; scene.add(g);
+      this.props["tally:" + i] = g;
+      World.interactables.push({
+        name: "Fallen tally-stake", verb: "Raise", x, z, r: 1.9,
+        onUse: () => {
+          const S = this.st.tally;
+          if (S.state !== "active") { hudQuote("A snapped tally-stake, its string lying in the mud. Kralanh counts the dusk's dead on these.", "TALLY-STAKE"); return; }
+          post.rotation.z = 0; post.position.y = y + .58;
+          Particles.burst(x, .8, z, 10, { color: [0xf3ead2, 0xd6a94a], spdMin: .3, spdMax: 1.2, sMax: .05, lifeMax: .7, grav: -1 });
+          SFX.swish(.5);
+          this.collect("tally");
+        }
+      });
+    });
+  }
+};
+
+/* side-quest lines in Khmer (DL falls back to English if missed) */
+Object.assign(KM_DL, {
+  "Srey Noch\u0001The rain put the candles out on the graves past the east wall. Three dark slabs, no rice, restless neighbors.":
+    "ភ្លៀងបានផ្លុំពន្លត់ធូបនៅផ្នូរផុតជញ្ជាំងខាងកើត។ ផ្ទាំងថ្មងងឹតបួនធំ គ្មានស្រូវ អ្នកជិតខាងមិនសុខ។",
+  "Srey Noch\u0001Bring a handful of rice to each — my kind of housekeeping. Tevy sells what the dead like to eat.":
+    "យកដៃស្រូវមួយទៅឱ្យម្នាក់ៗ — ការធ្វើផ្ទះបែបរបស់ខ្ញុំ។ ទេវីលក់អ្វីដែលអ្នកស្លាប់ចូលចិត្ត។",
+  "Srey Noch\u0001They'll hum when they're fed. You'll hear it.":
+    "ពួកវានឹងបន្លឺពេលឆ្អិត។ អ្នកនឹងឮវា។",
+  "Srey Noch\u0001You hear that? The graves are humming. First time since the drowning.":
+    "អ្នកឮទេ? ផ្នូរកំពុងបន្លឺ។ ដំបូងតាំងពីការលង់ទឹក។",
+  "Srey Noch\u0001Take the bow. Grandmother tied it for a warden who owed me. Red keeps the hungry ones calm — mostly.":
+    "យកធ្នាប់នោះទៅ។ លោកយាយកួរវាសម្រាប់អ្នកភ្ញាក់ផ្សាម្នាក់ដែលមានបំណុលខ្ញុំ។ ពណ៌ក្រហមរក្សាអ្នកឃ្លានឱ្យស្ងប់ — ភាគច្រើន។",
+  "Dara\u0001My kite! The east wind took it — it's hanging in the dead tree past the gate, like a flag for the WRONG army.":
+    "ខ្យល់អាមរបស់ខ្ញុំ! ខ្យល់ខាងកើតយកវាទៅ — វាព្យួរនៅដើមស្លាប់ផុតទ្វារ ដូចទង់សម្រាប់កងទ័ព ខុស។",
+  "Dara\u0001You jump high now, everyone says. Get it down before the hanging ladies find it. They collect things.":
+    "អ្នកលោតខ្ពស់ឥឡូវនេះ អ្នកទាំងអស់គ្នាថាដូច្នេះ។ ដួះវាចុះមុនស្ត្រីព្យួររកឃើញ។ ពួកគេប្រមូលអ្វីៗ។",
+  "Dara\u0001MY KITE! You got it down! It isn't even torn — the wind just wanted to borrow it!":
+    "ខ្យល់អាមរបស់ខ្ញុំ! អ្នកដួះវាចុះហើយ! វាមិនដាច់ទេ — ខ្យល់គ្រាន់តែចង់ខ្ចីវា!",
+  "Dara\u0001Here — a luck-knot from my own stall money. It's the kind that works. All of it. I checked.":
+    "នៅទីនេះ — កួរសំណាងពីលុយរងំខ្លួនឯងរបស់ខ្ញុំ។ វាជាប្រភេទដែលដំណើរការ។ ទាំងអស់។ ខ្ញុំបានពិនិត្យហើយ។",
+  "Dara\u0001The tree past the gate, east. My kite is the red one. Everything else up there is worse.":
+    "ដើមស្លាប់ផុតទ្វារ ខាងកើត។ ខ្យល់អាមរបស់ខ្ញុំជាពណ៌ក្រហម។ អ្វីដែលនៅខ្ពស់ផ្សេងទៀតអាក្រក់ជាង។",
+  "Warden Kralanh\u0001Three of my tally-stakes are down. The dead lean on them at night and snap the strings.":
+    "សសរសម្គាល់របស់ខ្ញុំបួនធំដួលហើយ។ អ្នកស្លាប់ទ្រេតលើវាពេលយប់ ហើយដាច់ខ្សែ។",
+  "Warden Kralanh\u0001One south of the gate, two out east. Count what I cannot raise — I'll owe you, and the gate pays its debts.":
+    "មួយខាងត្បូងនៃទ្វារ ពួនធំនៅខាងកើត។ រាប់អ្វីដែលខ្ញុំឡើងវិញមិនបាន — ខ្ញុំមានបំណុលអ្នក ហើយទ្វារបង់បំណុលរបស់ខ្លួន។",
+  "Warden Kralanh\u0001Three stakes up, strings tight. I can count the dusk's dead properly again.":
+    "សសរឡើងវិញ ខ្សែតឹង។ ខ្ញុំអាចរាប់អ្នកស្លាប់ព្រលប់ឱ្យត្រឹមត្រូវម្ដងទៀត។",
+  "Warden Kralanh\u0001The gate pays what it owes: coin, and Sokha's best poultice. The wall leans lighter on you tonight.":
+    "ទ្វារបង់អ្វីដែលវាមានបំណុល៖ កាក់ និងថ្នាំផ្កាឈូកល្អបំផុតរបស់សុខា។ ជញ្ជាំងទ្រេតស្រាលលើអ្នកយប់នេះ។",
+  "*Three dark slabs wait past the east wall. Feed them rice and listen for the hum.":
+    "ផ្ទាំងថ្មងងឹតបួនធំរង់ចាំផុតជញ្ជាំងខាងកើត។ បំបៅស្រូវដល់ពួកវា ហើយស្ដាប់សំឡេងបន្លឺ។",
+  "*A red kite hangs in the dead tree east of the gate. Fetch it down.":
+    "ខ្យល់អាមក្រហមព្យួរនៅដើមស្លាប់ខាងកើតនៃទ្វារ។ ដួះវាចុះមក។",
+  "*Three tally-stakes lie snapped in the fields. Raise them again.":
+    "សសរសម្គាល់ដាច់នៅក្នុងស្រែ។ ឡើងវិញចុះ។",
+  "*The slab drinks the offering. Something under the mud hums — low, grateful.":
+    "ផ្ទាំងថ្មផឹកសំណើរ។ អ្វីម្យ៉ាងក្រោមភក់បន្លឺ — ទាប ដោយក្ដីអរគុណ។",
+  "*The kite comes free of the branch, trailing half the tree's ribbons. It smells of ember and rain.":
+    "ខ្យល់អាមរួចផុតមែក រងំខ្សែរបស់ដើមពាក់កណ្ដាល។ វាមានក្លិនធ្យូងនិងភ្លៀង។",
+  "*The stake stands. The snapped string reties itself — the warden's knots remember their work.":
+    "សសរឈ្ងោក។ ខ្សែដាច់កួរខ្លួនវាឡើងវិញ — កួររបស់អ្នកភ្ញាក់ផ្សាចងចាំការងាររបស់វា។",
+  "*The graves are fed. Bring the hum back to Noch.": "ផ្នូរឆ្អិតហើយ។ យកសំឡេងបន្លឺត្រឡប់ទៅឱ្យពុធា។",
+  "*The kite is safe. Dara will want it back.": "ខ្យល់អាមសុវត្ថិភាពហើយ។ ដារានឹងចង់បានវាត្រឡប់មកវិញ។",
+  "*The tally stands whole again. Report to Kralanh.": "សម្គាល់ឈ្ងោកពេញលេញម្ដងទៀត។ របាយការណ៍ទៅក្រឡាន់។",
+  "*Noch ties the bow to your belt. The graves hum behind you, fed and dreamless.":
+    "ពុធាកួរធ្នាប់នៅខ្សោយអ្នក។ ផ្នូរបន្លឺនៅខ្នងអ្នក ឆ្អិត ហើយគ្មានសុបិន។",
+  "*The kite rides the wind again — from Dara's hand this time, on a string she trusts.":
+    "ខ្យល់អាមហោះលើខ្យល់ម្ដងទៀត — ពីដៃដារាម្ដងនេះ លើខ្សែដែលនាងទុកចិត្ត។",
+  "*Kralanh notches his post. For the first time tonight the count comes out even.":
+    "ក្រឡាន់សម្គាល់នៅកន្លែងរបស់គាត់។ ដំបូងយប់នេះការរាប់ចេញស្មើ។",
+  "*A drowned grave-slab. The rice bowl is empty and the dark is patient.":
+    "ផ្ទាំងថ្មផ្នូរលង់ទឹក។ ចានស្រូវទំនេរ ហើយភាពងងឹតមានចិត្តឱ្យ។",
+  "*This one is fed. It hums like a held note.": "មួយនេះឆ្អិតហើយ។ វាបន្លឺដូចចុងដែលកាន់។",
+  "*Your pouch has no rice. Tevy's stall sells what the dead like to eat.":
+    "ថង់អ្នកគ្មានស្រូវ។ រងំរបស់ទេវីលក់អ្វីដែលអ្នកស្លាប់ចូលចិត្ត។",
+  "*NO RICE": "គ្មានស្រូវ",
+  "*GRAVE SLAB": "ផ្ទាំងថ្មផ្នូរ",
+  "*STUCK KITE": "ខ្យល់អាមជាប់",
+  "*TALLY-STAKE": "សសរសម្គាល់"
+});
 
 /* chronicle — the story-so-far panel in the pause menu */
 function chronicleHTML() {
@@ -12317,15 +13412,17 @@ function hudQuest() {
       ["Chapter 6 — the Wedding Song: dawn over the drowned village.", true]);
     meta = "DAWN · SAMBOK CHAS RESTS";
   }
-  HUD.questNow.textContent = now;
+  /* side errands ride under the main objective */
+  if (typeof SIDEQ !== "undefined") items.push(...SIDEQ.hudItems());
+  HUD.questNow.textContent = DL(now);
   HUD.questMeta.textContent = TQ(meta);
-  HUD.questList.innerHTML = items.map(([t, done]) => `<li class="${done ? "done" : ""}">${t}</li>`).join("");
+  HUD.questList.innerHTML = items.map(([t, done]) => `<li class="${done ? "done" : ""}">${DL(t)}</li>`).join("");
 }
 
 let quoteTimer = null;
 function hudQuote(text, src, who) {
   const whoHtml = who ? `<span class="who">${who}</span>` : "";
-  HUD.quote.innerHTML = whoHtml + text + (src ? `<span class="src">— ${src}</span>` : "");
+  HUD.quote.innerHTML = whoHtml + DL(text, who) + (src ? `<span class="src">— ${DSRC(src)}</span>` : "");
   HUD.quote.style.opacity = 1;
   clearTimeout(quoteTimer);
   /* dialogue lines hold until advanced; ambient quotes fade */
@@ -12353,9 +13450,11 @@ function hudInteract(txt) {
 const DIALOG = { active: false, lines: [], idx: 0, cb: null, speaker: null };
 function hudDialogue(lines, cb, speaker) {
   DIALOG.active = true; DIALOG.lines = lines; DIALOG.idx = 0;
+  /* display lines are translated per-language; voice keys stay English */
+  DIALOG.show = lines.map(l => DL(l, speaker));
   DIALOG.cb = cb || null; DIALOG.speaker = speaker || null;
   DIALOG.vkey = (speaker && typeof VOICE !== "undefined") ? VOICE.key(speaker, lines) : null;
-  hudQuote(lines[0], "E — continue", DIALOG.speaker);
+  hudQuote(DIALOG.show[0], "E — continue", DIALOG.speaker);
   if (DIALOG.speaker && typeof VOICE !== "undefined") VOICE.speak(DIALOG.speaker, DIALOG.vkey, 0, lines[0].length / 3.2);
 }
 function dialogAdvance() {
@@ -12368,7 +13467,7 @@ function dialogAdvance() {
     if (spk && typeof STORY_HOOKS !== "undefined" && STORY_HOOKS[spk]) STORY_HOOKS[spk]();
     if (cb) cb();
   } else {
-    hudQuote(DIALOG.lines[DIALOG.idx], "E — continue", DIALOG.speaker);
+    hudQuote(DIALOG.show[DIALOG.idx], "E — continue", DIALOG.speaker);
     if (DIALOG.speaker && typeof VOICE !== "undefined") VOICE.speak(DIALOG.speaker, DIALOG.vkey, DIALOG.idx, DIALOG.lines[DIALOG.idx].length / 3.2);
   }
 }
@@ -12703,8 +13802,8 @@ function pumpCut() {
   if (W3.state !== "play" || !cutQueue.length) return;
   const c = cutQueue.shift(); cutThen = c.then || null;
   document.getElementById("cutImg").src = CUT_ART[c.art] || CUT_ART.intro;
-  document.getElementById("cutTitle").textContent = TQ(c.title);
-  document.getElementById("cutText").textContent = TQ(c.text);
+  document.getElementById("cutTitle").textContent = DSRC(c.title);
+  document.getElementById("cutText").textContent = DL(c.text);
   document.getElementById("cutHint").textContent = T("pressAny");
   document.getElementById("cutscene").style.display = "flex";
   W3.state = "cut";
@@ -12756,6 +13855,7 @@ const EN = {
 function T(k) { return LANG === "km" ? (L10N[k] || k) : (EN[k] || k); }
 function TQ(s) {
   if (LANG !== "km") return s;
+  if (typeof KM_SRC !== "undefined" && KM_SRC[s]) return KM_SRC[s];  /* quest metas with suffixes */
   const direct = L10N["q:" + s]; if (direct) return direct;
   const brief = L10N["q:b:" + s]; if (brief) return brief;
   const m = String(s).match(/^(.+?) · CHAPTER (\d+)( CLEARED)?$/);
@@ -12765,6 +13865,10 @@ function TQ(s) {
 function applyLang() {
   document.body.dataset.lang = LANG;
   try { localStorage.setItem("woas_lang", LANG); } catch (e) {}
+  const hb = document.getElementById("hintbar");
+  if (hb) hb.textContent = LANG === "km"
+    ? "WASD / ព្រួតខាង ដើរ · SHIFT រត់ · LMB/J ប្រហារ (ចុចឱ្យជាប់ = ប្រហារធំ) · SPACE គេច · E និយាយ · ១–៤ ពរ · H ជំនួយ · C ធូប · X ស្រូវ · G កួរ · អូស / Q·R មើល · V ភ្នែកឃើញព្រាយ · M ផែនទី · TAB មឺនុយ"
+    : "WASD / Arrows move · SHIFT sprint · LMB/J strike (hold = heavy) · SPACE dodge · E talk · 1–4 blessings · H heal · C incense · X rice · G charm · Drag / Q·R look · V curse-vision · M map · TAB menu";
   for (const [sel, k] of [["#newGameBtn", "newGame"], ["#resumeBtn", "resume"], ["#retryBtn", "retry"], ["#mapBtn", "map"], ["#chronBtn", "chronicle"]]) {
     const el = document.querySelector(sel); if (el) el.textContent = T(k);
   }
@@ -12796,6 +13900,7 @@ function boot() {
   document.getElementById("loading").style.display = "none";
   console.log("BOOT: world");
   buildWorld(W3.scene);
+  if (typeof SIDEQ !== "undefined" && SIDEQ.build) SIDEQ.build(W3.scene);
   console.log("BOOT: bopha");
   bopha = initBopha(W3.scene);
   W3.scene.add(Particles.points);
@@ -12824,6 +13929,7 @@ function boot() {
   window.__WEATHER = WEATHER; window.__MUSIC = MUSIC; window.__VOICE = VOICE;
   window.__VOICE_PROFILES = VOICE_PROFILES;
   window.__MAPSYS = MAPSYS; window.__STORY = STORY;
+  window.__hurtPlayer = hurtPlayer; window.__SIDEQ = SIDEQ;
   window.__Embers = Embers; window.__spawnEmber = spawnEmberPickup;
   window.__questBeat = questBeat;
   window.__combatStrike = combatStrike; window.__hudQuest = hudQuest;
@@ -12926,15 +14032,19 @@ function handleInteract(dt) {
   DIALOG.pendingE = false;
   const it = nearestInteractable();
   if (!it || P_player.dead) { hudInteract(null); return; }
-  hudInteract("E — " + (it.verb || "Talk to") + " " + it.name.split(" — ")[0]);
+  const verb = it.verb || "Talk to";
+  hudInteract("E — " + (LANG === "km" ? (VERB_KM[verb] || verb) : verb) + " " + it.name.split(" — ")[0]);
   if (!W3.keysOnce.e || interactLock > 0) return;
   interactLock = .25;
   if (it.npc) it.npc.player.play("talk", { restart: true });
   if (it.onUse) { it.onUse(); return; }            /* loot shrines, ladders */
   const speaker = it.name.split(" — ")[0];
-  /* phase-keyed story beats first (combat3d); static lines are the fallback */
+  /* phase-keyed story beats first (combat3d); side errands next;
+     static lines are the fallback */
   const beat = questBeat(speaker);
   if (beat) { hudDialogue(beat.lines, beat.cb, speaker); return; }
+  const sbeat = (typeof SIDEQ !== "undefined") ? SIDEQ.beat(speaker) : null;
+  if (sbeat) { hudDialogue(sbeat.lines, sbeat.cb, speaker); return; }
   hudDialogue(storyLines(speaker) || it.lines, null, speaker);
 }
 
