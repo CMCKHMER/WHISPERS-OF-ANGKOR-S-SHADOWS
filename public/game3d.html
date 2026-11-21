@@ -3267,6 +3267,27 @@ function groundY(x, z) {
   return h;
 }
 
+/* height of the RENDERED terrain surface (bilinear over the 111×111
+   lattice the ground plane actually draws). groundY alone is analytic —
+   between lattice vertices the drawn mesh dips below it on convex
+   ground, which made grass/scatter float. Placements sit on the mesh. */
+let _meshGrid = null;
+function meshGroundY(x, z) {
+  if (!_meshGrid) {
+    _meshGrid = new Float32Array(111 * 111);
+    const step = 168 / 110, O = -84;
+    for (let i = 0; i < 111; i++)
+      for (let j = 0; j < 111; j++)
+        _meshGrid[i * 111 + j] = groundY(O + j * step, O + i * step);
+  }
+  const step = 168 / 110, O = -84;
+  const fx = clamp((x - O) / step, 0, 110), fz = clamp((z - O) / step, 0, 110);
+  const j0 = Math.min(109, fx | 0), i0 = Math.min(109, fz | 0);
+  const tx = fx - j0, tz = fz - i0, b = (i, j) => _meshGrid[i * 111 + j];
+  return b(i0, j0) * (1 - tx) * (1 - tz) + b(i0, j0 + 1) * tx * (1 - tz)
+       + b(i0 + 1, j0) * (1 - tx) * tz + b(i0 + 1, j0 + 1) * tx * tz;
+}
+
 /* forest coverage mask — trees/undergrowth density */
 function forestDensity(x, z) {
   /* landmark clearings (temple3d) — nothing grows through the ruins */
@@ -3564,6 +3585,13 @@ function buildGround(scene) {
   const ground = new THREE.Mesh(geo, gMat);
   ground.receiveShadow = true;
   scene.add(ground);
+  /* cache the drawn lattice heights — meshGroundY() serves these so
+     scatter sits on the real surface, not the analytic function */
+  {
+    const gp = geo.attributes.position;
+    _meshGrid = new Float32Array(gp.count);
+    for (let i = 0; i < gp.count; i++) _meshGrid[i] = gp.getY(i);
+  }
 
   /* --- flooded paddies: water + rice stands --- */
   const wm = waterMat();
@@ -5126,7 +5154,7 @@ function buildScatter(scene) {
     if (!openSpot(x, z)) continue;
     if (Math.hypot(x, z) < 9.5 && Math.random() > 0.12) continue;
     cTmp.setHSL(0.28 + rand(-0.035, 0.035), rand(0.3, 0.5), rand(0.14, 0.28));
-    gSpots.push({ x, y: groundY(x, z) - 0.01, z, s: rand(0.7, 1.5), sy: rand(0.8, 1.6), ry: rand(0, TAU), c: cTmp.clone() });
+    gSpots.push({ x, y: meshGroundY(x, z) - 0.01, z, s: rand(0.7, 1.5), sy: rand(0.8, 1.6), ry: rand(0, TAU), c: cTmp.clone() });
   }
   scatterInst(scene, bladeGeo, GRASS_M(), gSpots);
 
@@ -5173,7 +5201,7 @@ function buildScatter(scene) {
     if (fd < 0.3 || Math.random() > fd) continue;
     if (!openSpot(x, z, { pathGap: 1.7 })) continue;
     cTmp.setHSL(0.3 + rand(-0.03, 0.03), rand(0.3, 0.45), rand(0.12, 0.22));
-    sSpots.push({ x, y: groundY(x, z) - 0.02, z, s: rand(0.7, 1.5), sy: rand(0.8, 1.4), ry: rand(0, TAU), c: cTmp.clone() });
+    sSpots.push({ x, y: meshGroundY(x, z) - 0.02, z, s: rand(0.7, 1.5), sy: rand(0.8, 1.4), ry: rand(0, TAU), c: cTmp.clone() });
   }
   scatterInst(scene, shrubGeo, SHRUB_M(), sSpots);
 
@@ -5197,7 +5225,7 @@ function buildScatter(scene) {
     if (Math.hypot(x, z) < 8) continue;
     if (!openSpot(x, z, { pathGap: 0.7 })) continue;
     cTmp.set(fCols[(Math.random() * fCols.length) | 0]).multiplyScalar(rand(0.7, 1));
-    fSpots.push({ x, y: groundY(x, z), z, s: rand(0.7, 1.3), ry: rand(0, TAU), c: cTmp.clone() });
+    fSpots.push({ x, y: meshGroundY(x, z), z, s: rand(0.7, 1.3), ry: rand(0, TAU), c: cTmp.clone() });
   }
   const DS_M = vtoonMat({ side: THREE.DoubleSide });
   scatterInst(scene, flowerGeo, DS_M, fSpots);
@@ -5220,7 +5248,7 @@ function buildScatter(scene) {
     if (!openSpot(x, z, { pathGap: 1.2 })) continue;
     if (forestDensity(x, z) < 0.15 && Math.random() > 0.3) continue;
     cTmp.setHSL(0.09, rand(0.2, 0.4), rand(0.35, 0.55));
-    mSpots.push({ x, y: groundY(x, z), z, s: rand(0.6, 1.4), ry: rand(0, TAU), c: cTmp.clone() });
+    mSpots.push({ x, y: meshGroundY(x, z), z, s: rand(0.6, 1.4), ry: rand(0, TAU), c: cTmp.clone() });
   }
   scatterInst(scene, shroomGeo, vtoonMat(), mSpots);
 
@@ -5238,7 +5266,7 @@ function buildScatter(scene) {
     if (!openSpot(x, z, { pathGap: 1.4 })) continue;
     if (forestDensity(x, z) < 0.2 && Math.random() > 0.25) continue;
     cTmp.setHSL(0.08, 0.3, rand(0.14, 0.24));
-    bSpots.push({ x, y: groundY(x, z) + 0.02, z, s: rand(0.4, 1.1), rx: rand(0, 0.3), ry: rand(0, TAU), rz: rand(0, 0.3), c: cTmp.clone() });
+    bSpots.push({ x, y: meshGroundY(x, z) + 0.02, z, s: rand(0.4, 1.1), rx: rand(0, 0.3), ry: rand(0, TAU), rz: rand(0, 0.3), c: cTmp.clone() });
   }
   scatterInst(scene, branchGeo, TRUNK_M(), bSpots);
 
@@ -5251,7 +5279,7 @@ function buildScatter(scene) {
     const x = Math.sin(a) * rr, z = Math.cos(a) * rr;
     if (inWater(x, z)) continue;
     cTmp.setHSL(0.24, rand(0.05, 0.18), rand(0.22, 0.4));
-    pSpots.push({ x, y: groundY(x, z) + 0.01, z, s: rand(0.5, 1.4), sy: rand(0.4, 0.8), ry: rand(0, TAU), c: cTmp.clone() });
+    pSpots.push({ x, y: meshGroundY(x, z) + 0.01, z, s: rand(0.5, 1.4), sy: rand(0.4, 0.8), ry: rand(0, TAU), c: cTmp.clone() });
   }
   scatterInst(scene, pebbleGeo, TRUNK_M(), pSpots);
 }
@@ -11000,7 +11028,10 @@ function mergedQuads(scene, spots, tex, blending, opacity) {
   for (const [x, z, w, d, tintC] of spots) {
     const g = new THREE.PlaneGeometry(w, d);
     g.rotateX(-Math.PI / 2);
-    g.translate(x, groundY(x, z) + 0.07, z);
+    g.translate(x, 0, z);
+    const qpos = g.attributes.position;            /* drape onto the mesh */
+    for (let vi = 0; vi < qpos.count; vi++)
+      qpos.setY(vi, meshGroundY(qpos.getX(vi), qpos.getZ(vi)) + 0.07);
     if (tintC) setVertColor(g, tintC); else setVertColor(g, 0xffffff);
     parts.push(g);
   }
@@ -11140,7 +11171,7 @@ function buildDetailScatter(scene) {
   inst(pebGeo, TRUNK_M(), pebSpots, (x, z, i) => {
     const s = rand(0.05, 0.15) * (fbm(x * 0.3 + 5, z * 0.3 + 9) > 0.55 ? 1.4 : 0.9);
     e.set(0, rand(0, TAU), 0); q.setFromEuler(e);
-    v3.set(x, groundY(x, z) + s * 0.22, z); s3.set(s, s * 0.8, s);
+    v3.set(x, meshGroundY(x, z) + s * 0.22, z); s3.set(s, s * 0.8, s);
     m4.compose(v3, q, s3);
     const g2 = rand(0.24, 0.42);
     cT.setRGB(g2, g2 * 0.97, g2 * 0.9);
@@ -11167,7 +11198,7 @@ function buildDetailScatter(scene) {
   inst(twigGeo, TRUNK_M(), twigSpots, (x, z, i) => {
     const s = rand(0.3, 0.85);
     e.set(rand(-0.08, 0.08), rand(0, TAU), rand(-0.08, 0.08)); q.setFromEuler(e);
-    v3.set(x, groundY(x, z) + 0.02, z); s3.set(s, s, s);
+    v3.set(x, meshGroundY(x, z) + 0.02, z); s3.set(s, s, s);
     m4.compose(v3, q, s3);
     const b = rand(0.32, 0.5);
     cT.setRGB(b, b * 0.82, b * 0.62);
@@ -11182,7 +11213,7 @@ function buildDetailScatter(scene) {
   const leafSpots = scatter(1700, 4200).filter(([x, z]) => Math.random() < (forestDensity(x, z) > 0.3 ? 0.92 : 0.3));
   inst(leafGeo, FLOWER_M(), leafSpots, (x, z, i) => {
     e.set(rand(-0.16, 0.16), rand(0, TAU), rand(-0.16, 0.16)); q.setFromEuler(e);
-    v3.set(x, groundY(x, z) + 0.03, z); s3.set(rand(0.7, 1.5), 1, rand(0.7, 1.5));
+    v3.set(x, meshGroundY(x, z) + 0.03, z); s3.set(rand(0.7, 1.5), 1, rand(0.7, 1.5));
     m4.compose(v3, q, s3);
     cT.setHSL(rand(0.055, 0.11), rand(0.45, 0.7), rand(0.16, 0.3));
   }, true);
@@ -11207,7 +11238,7 @@ function buildDetailScatter(scene) {
   }
   inst(sherdGeo, TRUNK_M(), sherdSpots, (x, z, i) => {
     e.set(0, rand(0, TAU), rand(-0.2, 0.2)); q.setFromEuler(e);
-    v3.set(x, groundY(x, z) + 0.02, z); s3.set(rand(0.6, 1.3), 1, rand(0.6, 1.3));
+    v3.set(x, meshGroundY(x, z) + 0.02, z); s3.set(rand(0.6, 1.3), 1, rand(0.6, 1.3));
     m4.compose(v3, q, s3);
     cT.setRGB(rand(0.45, 0.6), rand(0.3, 0.4), rand(0.24, 0.32));
   }, true);
@@ -11228,7 +11259,7 @@ function buildDetailScatter(scene) {
   inst(fernGeo, FLOWER_M(), fernSpots, (x, z, i) => {
     const s = rand(0.6, 1.3);
     e.set(0, rand(0, TAU), 0); q.setFromEuler(e);
-    v3.set(x, groundY(x, z) - 0.02, z); s3.set(s, s * rand(0.8, 1.25), s);
+    v3.set(x, meshGroundY(x, z) - 0.02, z); s3.set(s, s * rand(0.8, 1.25), s);
     m4.compose(v3, q, s3);
     cT.setHSL(0.34 + rand(-0.03, 0.03), rand(0.3, 0.5), rand(0.14, 0.24));
   }, true);
@@ -11249,7 +11280,7 @@ function buildDetailScatter(scene) {
   inst(bushGeo, SHRUB_M(), bushSpots, (x, z, i) => {
     const s = rand(0.7, 1.5);
     e.set(0, rand(0, TAU), 0); q.setFromEuler(e);
-    v3.set(x, groundY(x, z) - 0.03, z); s3.set(s, s * rand(0.85, 1.2), s);
+    v3.set(x, meshGroundY(x, z) - 0.03, z); s3.set(s, s * rand(0.85, 1.2), s);
     m4.compose(v3, q, s3);
     cT.setHSL(0.33 + rand(-0.03, 0.03), rand(0.35, 0.55), rand(0.12, 0.2));
   }, true);
